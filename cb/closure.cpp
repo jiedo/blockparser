@@ -1,4 +1,3 @@
-
 // Dump the transitive closure of a bunch of addresses
 
 #include <util.h>
@@ -165,7 +164,8 @@ struct Closure:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         vertices.resize(0);
@@ -187,4 +187,3 @@ struct Closure:public Callback
 };
 
 static Closure closure;
-

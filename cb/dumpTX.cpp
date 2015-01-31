@@ -22,6 +22,7 @@ struct DumpTX:public Callback
     uint64_t nbInputs;
     uint64_t nbOutputs;
     uint64_t currBlock;
+    uint32_t txVersion;
     uint64_t nbDumped;
     const uint8_t *txStart;
     std::vector<uint256_t> rootHashes;
@@ -53,7 +54,7 @@ struct DumpTX:public Callback
     }
 
     virtual int init(
-        int argc,
+        int        argc,
         const char *argv[]
     )
     {
@@ -70,7 +71,7 @@ struct DumpTX:public Callback
             info("dumping %d transactions\n", (int)rootHashes.size());
         } else {
             const char *defaultTX = "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"; // Expensive pizza
-            warning("no TX hashes specified, using the infamous 10K pizza TX");
+            warning("no TX hashes specified, using the famous 10K pizza TX");
             loadHash256List(rootHashes, defaultTX);
         }
 
@@ -91,7 +92,7 @@ struct DumpTX:public Callback
     {
         currBlock = b->height;
 
-        const uint8_t *p = b->data;
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -101,7 +102,8 @@ struct DumpTX:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         txStart = p;
@@ -287,8 +289,14 @@ struct DumpTX:public Callback
     }
 
     virtual void endInput(
-        const uint8_t *p
-    )
+                          const uint8_t *pend,
+                          const uint8_t *upTXHash,
+                          uint64_t      outputIndex,
+                          const uint8_t *downTXHash,
+                          uint64_t      inputIndex,
+                          const uint8_t *inputScript,
+                          uint64_t      inputScriptSize
+                          )
     {
         if(dump) {
             printf("    }\n\n");
@@ -365,4 +373,3 @@ struct DumpTX:public Callback
 };
 
 static DumpTX dumpTX;
-

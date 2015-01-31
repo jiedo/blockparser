@@ -1,4 +1,3 @@
-
 // Dump balance of all addresses ever used in the blockchain
 
 #include <util.h>
@@ -17,6 +16,8 @@ static uint8_t emptyKey[kSHA256ByteSize] = { 0x52 };
 typedef GoogMap<Hash160, Addr*, Hash160Hasher, Hash160Equal>::Map AddrMap;
 typedef GoogMap<Hash160, int, Hash160Hasher, Hash160Equal>::Map RestrictMap;
 
+extern uint64_t g_n_tx_reuse;
+
 struct Output {
     int64_t time;
     int64_t value;
@@ -25,19 +26,24 @@ struct Output {
     const uint8_t *upTXHash;
     const uint8_t *downTXHash;
 };
-typedef std::vector<Output> OutputVec;
+// typedef std::vector<Output> OutputVec;
 
 struct Addr
 {
     uint64_t sum;
-    uint64_t nbIn;
-    uint64_t nbOut;
+    uint32_t nbIn;
+    uint32_t nbOut;
     uint160_t hash;
-    uint32_t lastIn;
-    uint32_t lastOut;
-    OutputVec *outputVec;
+    uint32_t type;
+    // uint32_t lastIn;
+    // uint32_t lastOut;
+    // OutputVec *outputVec;
 };
 
+
+static std::vector<uint8_t *> vec_addr;
+template<> std::vector<uint8_t *> PagedAllocator<Addr>::reuse_pool = vec_addr;
+template<> uint32_t PagedAllocator<Addr>::total_malloc = 0;
 template<> uint8_t *PagedAllocator<Addr>::pool = 0;
 template<> uint8_t *PagedAllocator<Addr>::poolEnd = 0;
 static inline Addr *allocAddr() { return (Addr*)PagedAllocator<Addr>::alloc(); }
@@ -59,6 +65,7 @@ struct AllBalances:public Callback
     int64_t limit;
     uint64_t offset;
     int64_t showAddr;
+    int64_t nbTX;
     int64_t cutoffBlock;
     optparse::OptionParser parser;
 
@@ -124,6 +131,7 @@ struct AllBalances:public Callback
         const char *argv[]
     )
     {
+      nbTX = 0;
         offset = 0;
         curBlock = 0;
         lastBlock = 0;
@@ -169,7 +177,6 @@ struct AllBalances:public Callback
             }
         }
 
-        info("analyzing blockchain ...");
         return 0;
     }
 
@@ -183,7 +190,7 @@ struct AllBalances:public Callback
         uint64_t      inputIndex = -1
     )
     {
-        uint8_t addrType[3];
+        uint8_t addrType[4];
         uint160_t pubKeyHash;
         int type = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
         if(unlikely(type<0)) return;
@@ -204,38 +211,39 @@ struct AllBalances:public Callback
             addr = allocAddr();
 
             memcpy(addr->hash.v, pubKeyHash.v, kRIPEMD160ByteSize);
-            addr->outputVec = 0;
+            // addr->outputVec = 0;
+            addr->type = (uint32_t)addrType[0];
             addr->nbOut = 0;
             addr->nbIn = 0;
             addr->sum = 0;
 
-            if(detailed) {
-                addr->outputVec = new OutputVec;
-            }
+            // if(detailed) {
+            //     addr->outputVec = new OutputVec;
+            // }
 
             addrMap[addr->hash.v] = addr;
             allAddrs.push_back(addr);
         }
 
         if(0<value) {
-            addr->lastIn = blockTime;
+            // addr->lastIn = blockTime;
             ++(addr->nbIn);
         } else {
-            addr->lastOut = blockTime;
+            // addr->lastOut = blockTime;
             ++(addr->nbOut);
         }
         addr->sum += value;
 
-        if(detailed) {
-            struct Output output;
-            output.value = value;
-            output.time = blockTime;
-            output.upTXHash = upTXHash;
-            output.downTXHash = downTXHash;
-            output.inputIndex = inputIndex;
-            output.outputIndex = outputIndex;
-            addr->outputVec->push_back(output);
-        }
+        // if(detailed) {
+        //     struct Output output;
+        //     output.value = value;
+        //     output.time = blockTime;
+        //     output.upTXHash = upTXHash;
+        //     output.downTXHash = downTXHash;
+        //     output.inputIndex = inputIndex;
+        //     output.outputIndex = outputIndex;
+        //     // addr->outputVec->push_back(output);
+        // }
     }
 
     virtual void endOutput(
@@ -292,28 +300,19 @@ struct AllBalances:public Callback
         );
     }
 
-    virtual void wrapup()
-    {
-        info("done\n");
+    virtual void wrapup() {
 
+        CompareAddr compare;
+        auto e = allAddrs.end();
+        auto s = allAddrs.begin();
         info("sorting by balance ...");
-
-            CompareAddr compare;
-            auto e = allAddrs.end();
-            auto s = allAddrs.begin();
-            std::sort(s, e, compare);
-
-        info("done\n");
+        std::sort(s, e, compare);
 
         uint64_t nbRestricts = (uint64_t)restrictMap.size();
         if(0==nbRestricts) info("dumping all balances ...");
         else               info("dumping balances for %" PRIu64 " addresses ...", nbRestricts);
 
-        printf(
-            "---------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
-            "                 Balance                                  Hash160                             Base58   nbIn lastTimeIn                 nbOut lastTimeOut\n"
-            "---------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
-        );
+        // printf("Balance                                  Hash160                             Base58   nbIn lastTimeIn                 nbOut lastTimeOut\n");
 
         int64_t i = 0;
         int64_t nonZeroCnt = 0;
@@ -328,42 +327,39 @@ struct AllBalances:public Callback
                 if(restrictMap.end()==r) continue;
             }
 
-            printf("%24.8f ", (1e-8)*addr->sum);
-            showHex(addr->hash.v, kRIPEMD160ByteSize, false);
+            printf("%" PRIu64 "\t", addr->sum);
+            // showHex(addr->hash.v, kRIPEMD160ByteSize, false);
             if(0<addr->sum) ++nonZeroCnt;
 
-            if(i<showAddr || 0!=nbRestricts) {
-                uint8_t buf[64];
-                hash160ToAddr(buf, addr->hash.v);
-                printf(" %s", buf);
-            } else {
-                printf(" XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
-            }
+            uint8_t buf[64];
+            hash160ToAddr(buf, addr->hash.v, addr->type);
+            printf("%s\t%d\t%d\n",
+                   buf, addr->nbIn, addr->nbOut);
 
-            char timeBuf[256];
-            gmTime(timeBuf, addr->lastIn);
-            printf(" %6" PRIu64 " %s ", addr->nbIn, timeBuf);
+            // char timeBuf[256];
+            // if(detailed) {
+            //   // gmTime(timeBuf, addr->lastIn);
+            //   printf(" %6" PRIu64 " %s ", addr->nbIn, timeBuf);
 
-            gmTime(timeBuf, addr->lastOut);
-            printf(" %6" PRIu64 " %s\n", addr->nbOut, timeBuf);
+            //   gmTime(timeBuf, addr->lastOut);
+            //   printf(" %6" PRIu64 " %s\n", addr->nbOut, timeBuf);
 
-            if(detailed) {
-                auto e = addr->outputVec->end();
-                auto s = addr->outputVec->begin();
-                while(s!=e) {
-                    printf("    %24.8f ", 1e-8*s->value);
-                    gmTime(timeBuf, s->time);
-                    showHex(s->upTXHash);
-                    printf("%4" PRIu64 " %s", s->outputIndex, timeBuf);
-                    if(s->downTXHash) {
-                        printf(" -> %4" PRIu64 " ", s->inputIndex);
-                        showHex(s->upTXHash);
-                    }
-                    printf("\n");
-                    ++s;
-                }
-                printf("\n");
-            }
+            //   auto e = addr->outputVec->end();
+            //   auto s = addr->outputVec->begin();
+            //   while(s!=e) {
+            //     printf("    %24.8f ", 1e-8*s->value);
+            //     gmTime(timeBuf, s->time);
+            //     showHex(s->upTXHash);
+            //     printf("%4" PRIu64 " %s", s->outputIndex, timeBuf);
+            //     if(s->downTXHash) {
+            //       printf(" -> %4" PRIu64 " ", s->inputIndex);
+            //       showHex(s->upTXHash);
+            //     }
+            //     printf("\n");
+            //     ++s;
+            //   }
+            //   printf("\n");
+            // }
 
             ++i;
         }
@@ -373,7 +369,6 @@ struct AllBalances:public Callback
         info("found %" PRIu64 " addresses in total", (uint64_t)allAddrs.size());
         info("shown:%" PRIu64 " addresses", (uint64_t)i);
         printf("\n");
-        exit(0);
     }
 
     virtual void start(
@@ -385,6 +380,11 @@ struct AllBalances:public Callback
         lastBlock = e;
     }
 
+    virtual void startTX(const uint8_t *p,
+                         const uint8_t *hash,
+                         const uint8_t *txEnd)
+    { ++nbTX;}
+
     virtual void startBlock(
         const Block *b,
         uint64_t chainSize
@@ -392,10 +392,8 @@ struct AllBalances:public Callback
     {
         curBlock = b;
 
-        const uint8_t *p = b->data;
-        const uint8_t *sz = -4 + p;
-        LOAD(uint32_t, size, sz);
-        offset += size;
+        const uint8_t *p = b->chunk->getData();
+        offset += b->chunk->getSize();
 
         double now = usecs();
         static double startTime = 0;
@@ -418,12 +416,17 @@ struct AllBalances:public Callback
                 "%6.2f%% , "
                 "elapsed = %5.2fs , "
                 "eta = %5.2fs , "
+                "nAlloc256=%d, theory nAlloc256=%f, theory reuse nAlloc256=%f, reuse=%" PRIu64 " "
                 ,
                 curBlock->height,
                 addrMap.size()*1e-6,
                 100.0*progress,
                 elasedSinceStart,
-                (1.0/speed) - elasedSinceStart
+                (1.0/speed) - elasedSinceStart,
+                sizeHash256(),
+                (curBlock->height+nbTX)/16384.0,
+                (curBlock->height + nbTX - g_n_tx_reuse)/16384.0,
+                g_n_tx_reuse
             );
 
             lastStatTime = now;
@@ -437,10 +440,10 @@ struct AllBalances:public Callback
 
         if(0<=cutoffBlock && cutoffBlock<=curBlock->height) {
             wrapup();
+            exit(0);
         }
     }
 
 };
 
 static AllBalances allBalances;
-

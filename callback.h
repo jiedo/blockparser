@@ -30,18 +30,33 @@
 
         // Callback for second, deep parse -- only valid blocks are seen, and are parsed in details
         virtual void        start(  const Block *s, const Block *e     )       {               }  // Called when the second parse of the full chain starts
-        virtual void      startTX(const uint8_t *p, const uint8_t *hash)       {               }  // Called when a new TX is encountered
+        virtual void     startTXs(const uint8_t *p                     )       {               }  // Called when start list of TX is encountered
+        virtual void       endTXs(const uint8_t *p                     )       {               }  // Called when end list of TX is encountered
+        virtual void      startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd=0){}// Called when a new TX is encountered
         virtual void        endTX(const uint8_t *p                     )       {               }  // Called when an end of TX is encountered
         virtual void  startInputs(const uint8_t *p                     )       {               }  // Called when the start of a TX's input array is encountered
         virtual void    endInputs(const uint8_t *p                     )       {               }  // Called when the end of a TX's input array is encountered
         virtual void   startInput(const uint8_t *p                     )       {               }  // Called when a TX input is encountered
-        virtual void     endInput(const uint8_t *p                     )       {               }  // Called when at the end of a TX input
+      //virtual void     endInput(const uint8_t *p                     )       {               }  // Called when at the end of a TX input
         virtual void startOutputs(const uint8_t *p                     )       {               }  // Called when the start of a TX's output array is encountered
         virtual void   endOutputs(const uint8_t *p                     )       {               }  // Called when the end of a TX's output array is encountered
         virtual void  startOutput(const uint8_t *p                     )       {               }  // Called when a TX output is encountered
-        virtual void   startBlock(  const Block *b, uint64_t chainSize )       {               }  // Called when a new block is encountered
-        virtual void     endBlock(  const Block *b                     )       {               }  // Called when an end of block is encountered
+        virtual void   startBlock(const Block *b, uint64_t chainSize   )       {               }  // Called when a new block is encountered
+        virtual void     endBlock(const Block *b                       )       {               }  // Called when an end of block is encountered
+        virtual void      startLC(                                     )       {               }  // Called when longest chain parse starts
         virtual void       wrapup(                                     )       {               }  // Called when the whole chain has been parsed
+
+
+
+      virtual inline void endInput(
+                                   const uint8_t *pend,                   // Pointer to TX output raw data
+                                   const uint8_t *upTXHash,
+                                   uint64_t      outputIndex,
+                                   const uint8_t *downTXHash,
+                                   uint64_t      inputIndex,
+                                   const uint8_t *inputScript,
+                                   uint64_t      inputScriptSize
+                                   ) {}
 
         // Called when an output has been fully parsed
         virtual void endOutput(
@@ -72,4 +87,3 @@
     };
 
 #endif // __CALLBACK_H__
-

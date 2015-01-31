@@ -184,10 +184,10 @@ struct SQLDump:public Callback
     {
         if(0<=cutoffBlock && cutoffBlock<b->height) wrapup();
 
+        auto p = b->chunk->getData();
         uint8_t blockHash[kSHA256ByteSize];
-        sha256Twice(blockHash, b->data, 80);
+        sha256Twice(blockHash, p, 80);
 
-        const uint8_t *p = b->data;
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -215,7 +215,8 @@ struct SQLDump:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         // id BIGINT PRIMARY KEY
@@ -331,4 +332,3 @@ struct SQLDump:public Callback
 };
 
 static SQLDump sqlDump;
-

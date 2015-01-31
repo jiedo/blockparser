@@ -1,4 +1,4 @@
-
+// 与地址A相关的, 包括输入/输出 的 Transactions
 // Dump all transactions affecting a specific address
 
 #include <time.h>
@@ -104,7 +104,7 @@ struct Transactions:public Callback
         const uint8_t *downTXHash = 0
     )
     {
-        uint8_t addrType[3];
+        uint8_t addrType[4];
         uint160_t pubKeyHash;
         int type = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
         if(unlikely(type<0)) return;
@@ -202,7 +202,7 @@ struct Transactions:public Callback
         uint64_t
     )
     {
-        const uint8_t *p = b->data;
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -228,17 +228,13 @@ struct Transactions:public Callback
         else {
             info("Dumping all transactions for %d address(es)\n", (int)addrMap.size());
             printf("    Time (GMT)                  Address                                     Transaction                                                                    OldBalance                     Amount                 NewBalance\n");
-            printf("    =======================================================================================================================================================================================================================\n");
+
         }
     }
 
     virtual void wrapup()
     {
         if(false==csv) {
-            printf(
-                "    =======================================================================================================================================================================================================================\n"
-            );
-
             info(
                 "\n"
                 "    transactions  = %" PRIu64 "\n"
@@ -256,4 +252,3 @@ struct Transactions:public Callback
 };
 
 static Transactions transactions;
-

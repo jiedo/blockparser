@@ -48,6 +48,8 @@ struct Rewards:public Callback
         fullDump = values.get("full");
 
         info("Dumping all block rewards in blockchain");
+        printf("block\tbaseReward\tfees\ttotal\n");
+
         return 0;
     }
 
@@ -56,7 +58,7 @@ struct Rewards:public Callback
         uint64_t
     )
     {
-        const uint8_t *p = b->data;
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -67,7 +69,8 @@ struct Rewards:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         currTXHash = hash;
@@ -114,8 +117,10 @@ struct Rewards:public Callback
             addrType
         );
         if(unlikely(-2==type)) return;
+        reward += value;
+        if(!fullDump) return;
 
-        if(unlikely(type<0) && 0!=value && fullDump) {
+        if(unlikely(type<0) && 0!=value) {
             printf("============================\n");
             printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock);
             fwrite(outputScript, outputScriptSize, 1, stdout);
@@ -126,16 +131,13 @@ struct Rewards:public Callback
             errFatal("invalid script");
         }
 
-        reward += value;
-        if(!fullDump) return;
-
         printf("%7d ", (int)currBlock);
         showHex(currTXHash);
 
         printf(" %16.8f ", 1e-8*value);
 
         if(type<0) {
-            printf("######################################## ##################################\n");
+            printf("##########################################################################\n");
             return;
         } else {
 
@@ -185,4 +187,3 @@ struct Rewards:public Callback
 };
 
 static Rewards rewards;
-

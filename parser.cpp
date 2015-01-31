@@ -13,46 +13,47 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if !defined(O_DIRECT)
-#   define O_DIRECT 0
-#endif
 
-struct Map
-{
-    int fd;
-    uint64_t size;
-    const uint8_t *p;
-    std::string name;
-};
-
-typedef GoogMap<Hash256, const uint8_t*, Hash256Hasher, Hash256Equal>::Map TXMap;
-typedef GoogMap<Hash256,         Block*, Hash256Hasher, Hash256Equal>::Map BlockMap;
+typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map::iterator TXIterator;
+typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map TXOMap;
+typedef GoogMap<Hash256, Block*, Hash256Hasher, Hash256Equal>::Map BlockMap;
 
 static bool gNeedTXHash;
 static Callback *gCallback;
 
-static const Map *gCurMap;
 static std::vector<Map> mapVec;
 
-static TXMap gTXMap;
+uint64_t g_n_tx_reuse;
+static TXIterator giCurTXOMap;
+
+static TXOMap gTXOMap;
 static BlockMap gBlockMap;
 static uint8_t empty[kSHA256ByteSize] = { 0x42 };
+static uint8_t hash256_deleted[kSHA256ByteSize] = { 0x00 };
 
 static Block *gMaxBlock;
 static Block *gNullBlock;
+static int64_t gMaxHeight;
 static uint64_t gChainSize;
-static uint64_t gMaxHeight;
 static uint256_t gNullHash;
+
+#if defined BITCOIN
+    static const size_t gHeaderSize = 80;
+    static auto gCoinDirName = "/.bitcoin/";
+    static const uint32_t gExpectedMagic = 0xd9b4bef9;
+#endif
 
 #define DO(x) x
     static inline void   startBlock(const uint8_t *p)                      { DO(gCallback->startBlock(p));    }
     static inline void     endBlock(const uint8_t *p)                      { DO(gCallback->endBlock(p));      }
-    static inline void      startTX(const uint8_t *p, const uint8_t *hash) { DO(gCallback->startTX(p, hash)); }
+    static inline void     startTXs(const uint8_t *p)                      { DO(gCallback->startTXs(p));      }
+    static inline void       endTXs(const uint8_t *p)                      { DO(gCallback->endTXs(p));        }
+    static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd){DO(gCallback->startTX(p,hash, txEnd));}
     static inline void        endTX(const uint8_t *p)                      { DO(gCallback->endTX(p));         }
     static inline void  startInputs(const uint8_t *p)                      { DO(gCallback->startInputs(p));   }
     static inline void    endInputs(const uint8_t *p)                      { DO(gCallback->endInputs(p));     }
     static inline void   startInput(const uint8_t *p)                      { DO(gCallback->startInput(p));    }
-    static inline void     endInput(const uint8_t *p)                      { DO(gCallback->endInput(p));      }
+//static inline void     endInput(const uint8_t *p)                      { DO(gCallback->endInput(p));      }
     static inline void startOutputs(const uint8_t *p)                      { DO(gCallback->startOutputs(p));  }
     static inline void   endOutputs(const uint8_t *p)                      { DO(gCallback->endOutputs(p));    }
     static inline void  startOutput(const uint8_t *p)                      { DO(gCallback->startOutput(p));   }
@@ -71,8 +72,7 @@ static inline void endOutput(
     uint64_t      outputIndex,
     const uint8_t *outputScript,
     uint64_t      outputScriptSize
-)
-{
+) {
     gCallback->endOutput(
         p,
         value,
@@ -81,6 +81,26 @@ static inline void endOutput(
         outputScript,
         outputScriptSize
     );
+}
+
+static inline void endInput(
+                            const uint8_t *pend,
+                            const uint8_t *upTXHash,
+                            uint64_t      outputIndex,
+                            const uint8_t *downTXHash,
+                            uint64_t      inputIndex,
+                            const uint8_t *inputScript,
+                            uint64_t      inputScriptSize
+) {
+    gCallback->endInput(
+                        pend,
+                        upTXHash,
+                        outputIndex,
+                        downTXHash,
+                        inputIndex,
+                        inputScript,
+                        inputScriptSize
+                        );
 }
 
 static inline void edge(
@@ -93,8 +113,7 @@ static inline void edge(
     uint64_t      inputIndex,
     const uint8_t *inputScript,
     uint64_t      inputScriptSize
-)
-{
+) {
     gCallback->edge(
         value,
         upTXHash,
@@ -108,6 +127,9 @@ static inline void edge(
     );
 }
 
+
+
+
 template<
     bool skip,
     bool fullContext
@@ -120,29 +142,40 @@ static void parseOutput(
     uint64_t      downInputIndex,
     const uint8_t *downInputScript,
     uint64_t      downInputScriptSize,
-    bool          found = false
-)
-{
-    if(!skip && !fullContext) startOutput(p);
+    bool          found = false,
+    uint64_t      nbOutputs = 1
+) {
+    if(!skip && !fullContext) {
+        startOutput(p);
+    }
 
         LOAD(uint64_t, value, p);
         LOAD_VARINT(outputScriptSize, p);
 
-        const uint8_t *outputScript = p;
+        auto outputScript = p;
         p += outputScriptSize;
 
         if(!skip && fullContext && found) {
-            edge(
-                value,
-                txHash,
-                outputIndex,
-                outputScript,
-                outputScriptSize,
-                downTXHash,
-                downInputIndex,
-                downInputScript,
-                downInputScriptSize
-            );
+             edge(
+                  value,
+                  txHash,
+                  outputIndex,
+                  outputScript,
+                  outputScriptSize,
+                  downTXHash,
+                  downInputIndex,
+                  downInputScript,
+                  downInputScriptSize
+                  );
+
+             auto i = giCurTXOMap;
+             if (nbOutputs == (++(i->second->count)))
+             {
+                  freeHash256((uint8_t*)i->first);
+                  Chunk::release(i->second);
+                  gTXOMap.erase(i);
+                  g_n_tx_reuse++;
+             }
         }
 
     if(!skip && !fullContext) {
@@ -169,13 +202,14 @@ static void parseOutputs(
     uint64_t      downInputIndex = 0,
     const uint8_t *downInputScript = 0,
     uint64_t      downInputScriptSize = 0
-)
-{
-    if(!skip && !fullContext) startOutputs(p);
+) {
+    if(!skip && !fullContext) {
+        startOutputs(p);
+    }
 
         LOAD_VARINT(nbOutputs, p);
         for(uint64_t outputIndex=0; outputIndex<nbOutputs; ++outputIndex) {
-            bool found = fullContext && !skip && (stopAtIndex==outputIndex);
+            auto found = (fullContext && !skip && (stopAtIndex==outputIndex));
             parseOutput<skip, fullContext>(
                 p,
                 txHash,
@@ -184,35 +218,43 @@ static void parseOutputs(
                 downInputIndex,
                 downInputScript,
                 downInputScriptSize,
-                found
+                found,
+                nbOutputs
             );
-            if(found) break;
+            if(found) {
+                break;
+            }
         }
 
-    if(!skip && !fullContext) endOutputs(p);
+    if(!skip && !fullContext) {
+        endOutputs(p);
+    }
 }
 
 template<
     bool skip
 >
 static void parseInput(
+    const Block   *block,
     const uint8_t *&p,
     const uint8_t *txHash,
     uint64_t      inputIndex
-)
-{
-    if(!skip) startInput(p);
+) {
+    if(!skip) {
+        startInput(p);
+    }
 
-        const uint8_t *upTXHash = p;
-        const uint8_t *upTXOutputs = 0;
-
+        auto upTXHash = p;
+        const Chunk *upTX = 0;
         if(gNeedTXHash && !skip) {
-            bool isGenTX = (0==memcmp(gNullHash.v, upTXHash, sizeof(gNullHash)));
+            auto isGenTX = (0==memcmp(gNullHash.v, upTXHash, sizeof(gNullHash)));
             if(likely(false==isGenTX)) {
-                auto i = gTXMap.find(upTXHash);
-                if(unlikely(gTXMap.end()==i))
-                    errFatal("failed to locate upstream TX");
-                upTXOutputs = i->second;
+                auto i = gTXOMap.find(upTXHash);
+                if(unlikely(gTXOMap.end()==i)) {
+                    errFatal("failed to locate upstream transaction");
+                }
+                upTX = i->second;
+                giCurTXOMap = i;
             }
         }
 
@@ -220,159 +262,469 @@ static void parseInput(
         LOAD(uint32_t, upOutputIndex, p);
         LOAD_VARINT(inputScriptSize, p);
 
-        if(!skip && 0!=upTXOutputs) {
-            const uint8_t *inputScript = p;
-            parseOutputs<false, true>(
-                upTXOutputs,
-                upTXHash,
-                upOutputIndex,
-                txHash,
-                inputIndex,
-                inputScript,
-                inputScriptSize
-            );
+        auto inputScript = p;
+        if(!skip && 0!=upTX) {
+            auto upTXOutputs = upTX->getData();
+                parseOutputs<false, true>(
+                    upTXOutputs,
+                    upTXHash,
+                    upOutputIndex,
+                    txHash,
+                    inputIndex,
+                    inputScript,
+                    inputScriptSize
+                );
+            upTX->releaseData();
         }
 
         p += inputScriptSize;
         SKIP(uint32_t, sequence, p);
 
-    if(!skip) endInput(p);
+    if(!skip) {
+      endInput(p,
+               upTXHash,
+               upOutputIndex,
+               txHash,
+               inputIndex,
+               inputScript,
+               inputScriptSize
+               );
+    }
 }
 
 template<
     bool skip
 >
 static void parseInputs(
+    const Block   *block,
     const uint8_t *&p,
     const uint8_t *txHash
-)
-{
-    if(!skip) startInputs(p);
+) {
+    if(!skip) {
+        startInputs(p);
+    }
 
-        LOAD_VARINT(nbInputs, p);
-        for(uint64_t inputIndex=0; inputIndex<nbInputs; ++inputIndex)
-            parseInput<skip>(p, txHash, inputIndex);
+    LOAD_VARINT(nbInputs, p);
+    for(uint64_t inputIndex=0; inputIndex<nbInputs; ++inputIndex) {
+        parseInput<skip>(block, p, txHash, inputIndex);
+    }
 
-    if(!skip) endInputs(p);
+    if(!skip) {
+        endInputs(p);
+    }
 }
 
 template<
     bool skip
 >
 static void parseTX(
+    const Block   *block,
     const uint8_t *&p
-)
-{
+) {
+    auto txStart = p;
+    auto txEnd = p;
+    if(!skip)
+        parseTX<true>(block, txEnd);
     uint8_t *txHash = 0;
-    const uint8_t *txStart = p;
-
     if(gNeedTXHash && !skip) {
-        const uint8_t *txEnd = p;
-        parseTX<true>(txEnd);
         txHash = allocHash256();
         sha256Twice(txHash, txStart, txEnd - txStart);
     }
 
-    if(!skip) startTX(p, txHash);
+    if(!skip)
+      startTX(p, txHash, txEnd);
 
-        SKIP(uint32_t, version, p);
+    SKIP(uint32_t, version, p);
 
-        parseInputs<skip>(p, txHash);
+    parseInputs<skip>(block, p, txHash);
 
-        if(gNeedTXHash && !skip)
-            gTXMap[txHash] = p;
+    Chunk *txo = 0;
+    size_t txoOffset = -1;
+    const uint8_t *outputsStart = p;
+    if(gNeedTXHash && !skip) {
+      txo = Chunk::alloc();
+      txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
+      gTXOMap[txHash] = txo;
+    }
 
-        parseOutputs<skip, false>(p, txHash);
+    parseOutputs<skip, false>(p, txHash);
 
-        SKIP(uint32_t, lockTime, p);
+    if(txo) {
+      size_t txoSize = p - outputsStart;
+      txo->init(
+                block->chunk->getMap(),
+                txoSize,
+                txoOffset
+                );
+    }
 
-    if(!skip) endTX(p);
+    SKIP(uint32_t, lockTime, p);
+
+    if(!skip)
+      endTX(p);
+
+    // in tx:
+    // SKIP(uint32_t, version, p);
+    //
+    // SKIP(uint32_t, lockTime, p);
 }
 
 static void parseBlock(
     const Block *block
-)
-{
+) {
     startBlock(block);
+        auto p = block->chunk->getData();
 
-        const uint8_t *p = block->data;
-        const uint8_t *header = p;
-        SKIP(uint32_t, version, p);
-        SKIP(uint256_t, prevBlkHash, p);
-        SKIP(uint256_t, blkMerkleRoot, p);
-        SKIP(uint32_t, blkTime, p);
-        SKIP(uint32_t, blkBits, p);
-        SKIP(uint32_t, blkNonce, p);
+            auto header = p;
+            SKIP(uint32_t, version, p);
+            SKIP(uint256_t, prevBlkHash, p);
+            SKIP(uint256_t, blkMerkleRoot, p);
+            SKIP(uint32_t, blkTime, p);
+            SKIP(uint32_t, blkBits, p);
+            SKIP(uint32_t, blkNonce, p);
 
-        LOAD_VARINT(nbTX, p);
-        for(uint64_t txIndex=0; likely(txIndex<nbTX); ++txIndex)
-            parseTX<false>(p);
+            startTXs(p);
+                LOAD_VARINT(nbTX, p);
+                for(uint64_t txIndex=0; likely(txIndex<nbTX); ++txIndex) {
+                    parseTX<false>(block, p);
+                }
+            endTXs(p);
 
+        block->chunk->releaseData();
     endBlock(block);
 }
 
-static void parseLongestChain()
-{
-    Block *blk = gNullBlock->next;
+static void parseLongestChain() {
 
-    start(blk, gMaxBlock);
-    while(likely(0!=blk)) {
-        parseBlock(blk);
-        blk = blk->next;
-    }
+    info("pass 4 -- full blockchain analysis ...");
+
+    gCallback->startLC();
+        auto blk = gNullBlock->next;
+        start(blk, gMaxBlock);
+        while(likely(0!=blk)) {
+            parseBlock(blk);
+            blk = blk->next;
+        }
+    gCallback->wrapup();
+
+    info("pass 4 -- done.");
 }
 
-static void findLongestChain()
-{
-    Block *block = gMaxBlock;
+static void wireLongestChain() {
+
+    info("pass 3 -- wire longest chain ...");
+
+    auto block = gMaxBlock;
     while(1) {
-
-        if(likely(0!=block->data)) {
-            const uint8_t *p = -4 + (block->data);
-            LOAD(uint32_t, size, p);
-            gChainSize += size;
+        auto prev = block->prev;
+        if(unlikely(0==prev)) {
+            break;
         }
-
-        Block *prev = block->prev;
-        if(unlikely(0==prev)) break;
         prev->next = block;
         block = prev;
     }
+
+    info(
+        "pass 3 -- done, maxHeight=%d",
+        (int)gMaxHeight
+    );
 }
 
 static void initCallback(
-    int  argc,
+    int   argc,
     char *argv[]
-)
-{
+) {
     const char *methodName = 0;
-    if(0<argc) methodName = argv[1];
-    if(0==methodName) methodName = "";
-    if(0==methodName[0]) methodName = "help";
+    if(0<argc) {
+        methodName = argv[1];
+    }
+    if(0==methodName) {
+        methodName = "";
+    }
+    if(0==methodName[0]) {
+        methodName = "help";
+    }
     gCallback = Callback::find(methodName);
     fprintf(stderr, "\n");
 
     info("starting command \"%s\"", gCallback->name());
 
     if(argv[1]) {
-        int i = 0;
-        while('-'==argv[1][i]) argv[1][i++] = 'x';
+        auto i = 0;
+        while('-'==argv[1][i]) {
+            argv[1][i++] = 'x';
+        }
     }
 
-    int ir = gCallback->init(argc, (const char **)argv);
-    if(ir<0) errFatal("callback init failed");
+    auto ir = gCallback->init(argc, (const char **)argv);
+    if(ir<0) {
+        errFatal("callback init failed");
+    }
     gNeedTXHash = gCallback->needTXHash();
 }
 
-static void mapBlockChainFiles()
+static void findBlockParent(
+    Block *b
+)
 {
-    std::string coinName(
-        #if defined LITECOIN
-            "/.litecoin/"
-        #else
-            "/.bitcoin/"
-        #endif
+    auto where = lseek64(
+        b->chunk->getMap()->fd,
+        b->chunk->getOffset(),
+        SEEK_SET
     );
+    if(where!=(signed)b->chunk->getOffset()) {
+        sysErrFatal(
+            "failed to seek into block chain file %s",
+            b->chunk->getMap()->name.c_str()
+        );
+    }
+
+    uint8_t buf[gHeaderSize];
+    auto nbRead = read(
+        b->chunk->getMap()->fd,
+        buf,
+        gHeaderSize
+    );
+    if(nbRead<(signed)gHeaderSize) {
+        sysErrFatal(
+            "failed to read from block chain file %s",
+            b->chunk->getMap()->name.c_str()
+        );
+    }
+
+    auto i = gBlockMap.find(4 + buf);
+    if(unlikely(gBlockMap.end()==i)) {
+
+        uint8_t bHash[2*kSHA256ByteSize + 1];
+        toHex(bHash, b->hash);
+
+        uint8_t pHash[2*kSHA256ByteSize + 1];
+        toHex(pHash, 4 + buf);
+
+        warning(
+            "in block %s failed to locate parent block %s",
+            bHash,
+            pHash
+        );
+        return;
+    }
+    b->prev = i->second;
+}
+
+static void computeBlockHeight(
+    Block  *block,
+    size_t &lateLinks
+) {
+
+    if(unlikely(gNullBlock==block)) {
+        return;
+    }
+
+    auto b = block;
+    while(b->height<0) {
+
+        if(unlikely(0==b->prev)) {
+
+            findBlockParent(b);
+            ++lateLinks;
+
+            if(0==b->prev) {
+                warning("failed to locate parent block");
+                return;
+            }
+        }
+
+        b->prev->next = b;
+        b = b->prev;
+    }
+
+    auto height = b->height;
+    while(1) {
+
+        b->height = height++;
+
+        if(likely(gMaxHeight<b->height)) {
+            gMaxHeight = b->height;
+            gMaxBlock = b;
+        }
+
+        auto next = b->next;
+        b->next = 0;
+
+        if(block==b) {
+            break;
+        }
+
+        b = next;
+    }
+}
+
+static void computeBlockHeights() {
+
+    size_t lateLinks = 0;
+    info("pass 2 -- link all blocks ...");
+    for(const auto &pair:gBlockMap) {
+        computeBlockHeight(pair.second, lateLinks);
+    }
+
+    info(
+        "pass 2 -- done, did %d late links",
+        (int)lateLinks
+    );
+}
+
+static void getBlockHeader(
+    size_t         &size,
+    Block         *&prev,
+          uint8_t *&hash,
+    size_t         &earlyMissCnt,
+    const uint8_t *p
+) {
+
+    LOAD(uint32_t, magic, p);
+    if(unlikely(gExpectedMagic!=magic)) {
+        hash = 0;
+        return;
+    }
+
+    LOAD(uint32_t, sz, p);
+    size = sz;
+    prev = 0;
+
+    hash = allocHash256();
+    sha256Twice(hash, p, gHeaderSize);
+
+    auto i = gBlockMap.find(p + 4);
+    if(likely(gBlockMap.end()!=i)) {
+        prev = i->second;
+    } else {
+        ++earlyMissCnt;
+    }
+}
+
+static void buildBlockHeaders() {
+
+    info("pass 1 -- walk all blocks and build headers ...");
+
+    size_t nbBlocks = 0;
+    size_t baseOffset = 0;
+    size_t earlyMissCnt = 0;
+    uint8_t buf[8+gHeaderSize];
+    const auto sz = sizeof(buf);
+    const auto startTime = usecs();
+    const auto oneMeg = 1024 * 1024;
+
+    for(const auto &map : mapVec) {
+
+        startMap(0);
+
+        while(1) {
+
+            auto nbRead = read(map.fd, buf, sz);
+            if(nbRead<(signed)sz) {
+                break;
+            }
+
+            startBlock((uint8_t*)0);
+
+            uint8_t *hash = 0;
+            Block *prevBlock = 0;
+            size_t blockSize = 0;
+
+            getBlockHeader(blockSize, prevBlock, hash, earlyMissCnt, buf);
+            if(unlikely(0==hash)) {
+                break;
+            }
+
+            auto where = lseek(map.fd, (blockSize + 8) - sz, SEEK_CUR);
+            auto blockOffset = where - blockSize;
+            if(where<0) {
+                break;
+            }
+
+            auto block = Block::alloc();
+            block->init(hash, &map, blockSize, prevBlock, blockOffset);
+            gBlockMap[hash] = block;
+            endBlock((uint8_t*)0);
+            ++nbBlocks;
+        }
+        baseOffset += map.size;
+
+        auto now = usecs();
+        auto elapsed = now - startTime;
+        auto bytesPerSec = baseOffset / (elapsed*1e-6);
+        auto bytesLeft = gChainSize - baseOffset;
+        auto secsLeft = bytesLeft / bytesPerSec;
+        fprintf(
+            stderr,
+            "%.2f%% (%.2f/%.2f Gigs) -- %6d blocks -- %.2f Megs/sec -- ETA %.0f secs -- ELAPSED %.0f secs            \r",
+            (100.0*baseOffset)/gChainSize,
+            baseOffset/(1000.0*oneMeg),
+            gChainSize/(1000.0*oneMeg),
+            (int)nbBlocks,
+            bytesPerSec*1e-6,
+            secsLeft,
+            elapsed*1e-6
+        );
+        fflush(stderr);
+
+        endMap(0);
+    }
+
+    if(0==nbBlocks) {
+        warning("found no blocks - giving up");
+        exit(1);
+    }
+
+    char msg[128];
+    msg[0] = 0;
+    if(0<earlyMissCnt) {
+        sprintf(msg, ", %d early link misses", (int)earlyMissCnt);
+    }
+
+    auto elapsed = 1e-6*(usecs() - startTime);
+    info(
+        "pass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s                                            ",
+        elapsed,
+        (int)nbBlocks,
+        (gChainSize * 1e-9),
+        (gChainSize * 1e-6) / elapsed,
+        msg
+    );
+}
+
+static void buildNullBlock() {
+    gBlockMap[gNullHash.v] = gNullBlock = Block::alloc();
+    gNullBlock->init(gNullHash.v, 0, 0, 0, 0);
+    gNullBlock->height = 0;
+}
+
+
+static void initHashtables() {
+
+    info("initializing hash tables");
+    gTXOMap.setEmptyKey(empty);
+    gTXOMap.setDeleteKey(hash256_deleted);
+    gBlockMap.setEmptyKey(empty);
+
+    gChainSize = 0;
+    for(const auto &map : mapVec) {
+        gChainSize += map.size;
+    }
+
+    auto txPerBytes = (52149122.0 / 26645195995.0);
+    auto nbTxEstimate = (size_t)(1.1 * txPerBytes * gChainSize);
+    gTXOMap.resize(nbTxEstimate);
+
+    auto blocksPerBytes = (331284.0 / 26645195995.0);
+    auto nbBlockEstimate = (size_t)(1.1 * blocksPerBytes * gChainSize);
+    gBlockMap.resize(nbBlockEstimate);
+
+    info("estimated number of blocks = %.2fK", 1e-3*nbBlockEstimate);
+    info("estimated number of transactions = %.2fM", 1e-6*nbTxEstimate);
+}
+
+static void makeBlockMaps() {
 
     const char *home = getenv("HOME");
     if(0==home) {
@@ -381,28 +733,34 @@ static void mapBlockChainFiles()
     }
 
     std::string homeDir(home);
-    std::string blockDir = homeDir + coinName + std::string("blocks");
+    std::string blockDir = homeDir + gCoinDirName + std::string("blocks");
 
     struct stat statBuf;
-    int r = stat(blockDir.c_str(), &statBuf);
-    bool oldStyle = (r<0 || !S_ISDIR(statBuf.st_mode));
+    auto r = stat(blockDir.c_str(), &statBuf);
+    auto oldStyle = (r<0 || !S_ISDIR(statBuf.st_mode));
 
-    int blkDatId = oldStyle ? 1 : 0;
-    const char *fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
+    int blkDatId = (oldStyle ? 1 : 0);
+    auto fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
     while(1) {
+
+      // if(220<blkDatId) {
+      //   break;
+      // }
 
         char buf[64];
         sprintf(buf, fmt, blkDatId++);
 
-        std::string blockMapFileName =
-            homeDir                             +
-            coinName                            +
+        auto blockMapFileName =
+            homeDir          +
+            gCoinDirName     +
             std::string(buf)
         ;
 
-        int blockMapFD = open(blockMapFileName.c_str(), O_DIRECT | O_RDONLY);
+        auto blockMapFD = open(blockMapFileName.c_str(), O_RDONLY);
         if(blockMapFD<0) {
-            if(1<blkDatId) break;
+            if(1<blkDatId) {
+                break;
+            }
             sysErrFatal(
                 "failed to open block chain file %s",
                 blockMapFileName.c_str()
@@ -410,14 +768,19 @@ static void mapBlockChainFiles()
         }
 
         struct stat statBuf;
-        int r = fstat(blockMapFD, &statBuf);
-        if(r<0) sysErrFatal( "failed to fstat block chain file %s", blockMapFileName.c_str());
-
-        size_t mapSize = statBuf.st_size;
-        void *pMap = mmap(0, mapSize, PROT_READ, MAP_PRIVATE, blockMapFD, 0);
-        if(((void*)-1)==pMap) {
+        int st0 = fstat(blockMapFD, &statBuf);
+        if(st0<0) {
             sysErrFatal(
-                "failed to mmap block chain file %s",
+                "failed to fstat block chain file %s",
+                blockMapFileName.c_str()
+            );
+        }
+
+        auto mapSize = statBuf.st_size;
+        auto st1 = posix_fadvise(blockMapFD, 0, mapSize, POSIX_FADV_NOREUSE);
+        if(st1<0) {
+            warning(
+                "failed to posix_fadvise on block chain file %s",
                 blockMapFileName.c_str()
             );
         }
@@ -426,206 +789,40 @@ static void mapBlockChainFiles()
         map.size = mapSize;
         map.fd = blockMapFD;
         map.name = blockMapFileName;
-        map.p = (const uint8_t*)pMap;
         mapVec.push_back(map);
     }
 }
 
-static void initHashtables()
-{
-    gTXMap.setEmptyKey(empty);
-    gBlockMap.setEmptyKey(empty);
-
-    auto e = mapVec.end();
-    uint64_t totalSize = 0;
-    auto i = mapVec.begin();
-    while(i!=e) totalSize += (i++)->size;
-
-    double txPerBytes = (3976774.0 / 1713189944.0);
-    size_t nbTxEstimate = (1.5 * txPerBytes * totalSize);
-    gTXMap.resize(nbTxEstimate);
-
-    double blocksPerBytes = (184284.0 / 1713189944.0);
-    size_t nbBlockEstimate = (1.5 * blocksPerBytes * totalSize);
-    gBlockMap.resize(nbBlockEstimate);
-}
-
-static void linkBlock(
-    Block *block
-)
-{
-    if(unlikely(0==block->data)) {
-        block->height = 0;
-        block->prev = 0;
-        block->next = 0;
-        return;
-    }
-
-    int depth = 0;
-    Block *b = block;
-    while(b->height<0) {
-
-        auto i = gBlockMap.find(4 + b->data);
-        if(unlikely(gBlockMap.end()==i)) {
-            uint8_t buf[2*kSHA256ByteSize + 1];
-            toHex(buf, 4 + b->data);
-            warning("at depth %d in chain, failed to locate parent block %s", depth, buf);
-            return;
+static void cleanMaps() {
+    for(const auto &map : mapVec) {
+        auto r = close(map.fd);
+        if(r<0) {
+            sysErr(
+                "failed to close block chain file %s",
+                map.name.c_str()
+            );
         }
-
-        Block *prev = i->second;
-        prev->next = b;
-        b->prev = prev;
-        b = prev;
-        ++depth;
-    }
-
-    uint64_t h = b->height;
-    while(block!=b) {
-
-        Block *next = b->next;
-        b->height = h;
-        b->next = 0;
-
-        if(likely(gMaxHeight<h)) {
-            gMaxHeight = h;
-            gMaxBlock = b;
-        }
-
-        b = next;
-        ++h;
-    }
-}
-
-static void linkAllBlocks()
-{
-    auto e = gBlockMap.end();
-    auto i = gBlockMap.begin();
-    while(i!=e) {
-
-        Block *block = (i++)->second;
-        linkBlock(block);
-    }
-}
-
-static bool buildBlock(
-    const uint8_t *&p,
-    const uint8_t *e
-)
-{
-    static const uint32_t expected =
-    #if defined(LITECOIN)
-        0xdbb6c0fb
-    #else
-        0xd9b4bef9
-    #endif
-    ;
-
-    if(unlikely(e<=(8+p))) {
-        //printf("end of map, reason : pointer past EOF\n");
-        return true;
-    }
-
-    LOAD(uint32_t, magic, p);
-    if(unlikely(expected!=magic)) {
-        //printf("end of map, reason : magic is fucked %d away from EOF\n", (int)(e-p));
-        return true;
-    }
-
-    LOAD(uint32_t, size, p);
-    if(unlikely(e<(p+size))) {
-        //printf("end of map, reason : end of block past EOF, %d past EOF\n", (int)((p+size)-e));
-        return true;
-    }
-
-    Block *block = allocBlock();
-    block->height = -1;
-    block->data = p;
-    block->prev = 0;
-    block->next = 0;
-
-    uint8_t *hash = allocHash256();
-    sha256Twice(hash, p, 80);
-    gBlockMap[hash] = block;
-    p += size;
-    return false;
-}
-
-static void buildAllBlocks()
-{
-    auto e = mapVec.end();
-    auto i = mapVec.begin();
-    while(i!=e) {
-
-        const Map *map = gCurMap = &(*(i++));
-        const uint8_t *end = map->size + map->p;
-        const uint8_t *p = map->p;
-
-        startMap(p);
-
-            while(1) {
-                if(unlikely(end<=p)) break;
-                bool done = buildBlock(p, end);
-                if(done) break;
-            }
-
-        endMap(p);
-    }
-}
-
-static void buildNullBlock()
-{
-    gBlockMap[gNullHash.v] = gNullBlock = allocBlock();
-    gNullBlock->data = 0;
-}
-
-static void firstPass()
-{
-    buildNullBlock();
-    buildAllBlocks();
-    linkAllBlocks();
-}
-
-static void secondPass()
-{
-    findLongestChain();
-    parseLongestChain();
-    gCallback->wrapup();
-}
-
-static void cleanMaps()
-{
-    auto e = mapVec.end();
-    auto i = mapVec.begin();
-    while(i!=e) {
-
-        const Map &map = *(i++);
-
-        int r = munmap((void*)map.p, map.size);
-        if(r<0) sysErr("failed to unmap block chain file %s", map.name.c_str());
-
-        r = close(map.fd);
-        if(r<0) sysErr("failed to unmap block chain file %s", map.name.c_str());
-
     }
 }
 
 int main(
-    int  argc,
+    int   argc,
     char *argv[]
-)
-{
-    double start = usecs();
+) {
 
-        initCallback(argc, argv);
-        mapBlockChainFiles();
-        initHashtables();
-        firstPass();
-        secondPass();
-        cleanMaps();
+    auto start = usecs();
 
-    double elapsed = (usecs()-start)*1e-6;
-    info("all done in %.3f seconds\n", elapsed);
+    initCallback(argc, argv);
+    makeBlockMaps();
+    initHashtables();
+    buildNullBlock();
+    buildBlockHeaders();
+    computeBlockHeights();
+    wireLongestChain();
+    parseLongestChain();
+    cleanMaps();
+
+    auto elapsed = (usecs() - start)*1e-6;
+    info("all done in %.2f seconds\n", elapsed);
     return 0;
 }
-
