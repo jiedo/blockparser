@@ -1,5 +1,8 @@
 
 // Find pristine blocks
+// get uniq r:
+// ./parse shortr > results
+// $ cat results | awk '{print $1}' | sort | uniq > rscript.data
 
 #include <util.h>
 #include <string.h>
@@ -239,7 +242,7 @@ struct DumpRscript:public Callback
 
      virtual void wrapup()
           {
-            printf("Found %" PRIu64 " dup R. %" PRIu64 " Bad R(by public key used)\n", nbBadR, nbBadP);
+            info("Found %" PRIu64 " dup R. %" PRIu64 " Bad R(by public key used)\n", nbBadR, nbBadP);
           }
 };
 

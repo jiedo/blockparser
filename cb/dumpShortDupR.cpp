@@ -148,7 +148,7 @@ struct dumpShortDupR:public Callback
 
                          uint8_t *rscript = allocHash64();
                          if (unlikely(nLenR > kSHA256ByteSize))
-                              memcpy(rscript, &(R[nLenR-32]), kSHA64ByteSize);
+                              memcpy(rscript, &(R[nLenR-kSHA256ByteSize]), kSHA64ByteSize);
                          else
                               memcpy(rscript, R, kSHA64ByteSize);
 
@@ -156,9 +156,13 @@ struct dumpShortDupR:public Callback
                          if(unlikely(rscriptMap.end()!=i)) {
                               freeHash64(rscript);
                               // lenR R outscript outi ini transection [origin transection]
-                              printf("R ");
-                              showHex(R, nLenR, false);
-                              printf("\n");
+                              if (unlikely(nLenR > kSHA256ByteSize))
+                                showHex(&(R[nLenR-kSHA256ByteSize]), kSHA256ByteSize, false);
+                              else
+                                showHex(R, nLenR, false);
+                              printf("\tblock:%" PRIu64 "\ttx:%" PRIu64 "\n",
+                                     currBlock, currTX);
+
                               fflush(stdout);
                               nbBadR++;
                          }
@@ -173,7 +177,7 @@ struct dumpShortDupR:public Callback
 
      virtual void wrapup()
           {
-               printf("Found %" PRIu64 " dup R.\n", nbBadR);
+               info("Found %" PRIu64 " dup R.\n", nbBadR);
           }
 };
 
