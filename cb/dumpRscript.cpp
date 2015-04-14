@@ -1,5 +1,4 @@
 
-// Find pristine blocks
 // get uniq r:
 // ./parse shortr > results
 // $ cat results | awk '{print $1}' | sort | uniq > rscript.data

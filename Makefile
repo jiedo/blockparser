@@ -66,6 +66,13 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpShortDupR.cpp -o .objs/dumpShortDupR.o
 	@mv .objs/dumpShortDupR.d .deps
 
+.objs/dumpShortRP.o : cb/dumpShortRP.cpp
+	@echo c++ -- cb/dumpShortRP.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpShortRP.cpp -o .objs/dumpShortRP.o
+	@mv .objs/dumpShortRP.d .deps
+
 .objs/dumpRscript.o : cb/dumpRscript.cpp
 	@echo c++ -- cb/dumpRscript.cpp
 	@mkdir -p .deps
@@ -189,6 +196,7 @@ all:parser
 OBJS=                       \
     .objs/allBalances.o     \
     .objs/dumpShortDupR.o   \
+    .objs/dumpShortRP.o     \
     .objs/dumpRscript.o     \
     .objs/callback.o        \
     .objs/closure.o         \
