@@ -1,7 +1,11 @@
 
-// get uniq r:
-// ./parse shortr > results
-// $ cat results | awk '{print $1}' | sort | uniq > rscript.data
+// print tx detail about specific r
+// need:
+//     rscript.data
+//     publickey.data
+
+// ./parse rscript > results
+//
 
 #include <util.h>
 #include <string.h>

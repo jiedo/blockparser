@@ -66,6 +66,15 @@ blockparser
 
             ./parser show
 
+
+        .
+    get uniq r:
+    ./parse shortr > results
+    $ cat results | awk '{print $1}' | sort | uniq > rscript.data
+
+
+
+
     Caveats:
     --------
 
@@ -128,4 +137,3 @@ blockparser
     --------
 
         Code is in the public domain.
-

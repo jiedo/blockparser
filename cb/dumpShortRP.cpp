@@ -1,7 +1,5 @@
 
-// get uniq r:
-// ./parse shortr > results
-// $ cat results | awk '{print $1}' | sort | uniq > rscript.data
+// find duplicate r, and find bad r(by public key used). then print it out
 
 #include <util.h>
 #include <string.h>

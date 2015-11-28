@@ -1,5 +1,5 @@
 
-// Find pristine blocks
+// Find duplicate r, and print r out
 
 #include <util.h>
 #include <string.h>
@@ -33,13 +33,13 @@ struct dumpShortDupR:public Callback
                     ;
           }
 
-     virtual const char                   *name() const         { return "shortr"; }
+     virtual const char                   *name() const         { return "dupr"; }
      virtual const optparse::OptionParser *optionParser() const { return &parser;  }
   // virtual bool                         needTXHash() const    { return true;     }
      virtual void aliases(
           std::vector<const char*> &v
           ) const {
-          v.push_back("shortr");
+          v.push_back("dupr");
      }
 
      virtual int init(
