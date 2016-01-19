@@ -149,7 +149,7 @@
     static inline uint8_t *allocHash256() { return         PagedAllocator<uint256_t>::alloc();  }
     static inline uint8_t *allocHash160() { return         PagedAllocator<uint160_t>::alloc();  }
     static inline uint8_t *allocHash64()  { return         PagedAllocator<hash64_t>::alloc();  }
-    static inline int freeHash64(uint8_t *ptr) { return   PagedAllocator<hash64_t>::free(ptr);}
+    static inline int freeHash64(uint8_t *ptr) { return    PagedAllocator<hash64_t>::free(ptr);}
 
     struct Map {
         int fd;
@@ -191,7 +191,7 @@
 
                 auto sz = read(map->fd, data, size);
                 if(sz!=(signed)size) {
-                    //fatal("can't map block");
+                  //fatal("can't map block");
                 }
             }
             return data;
