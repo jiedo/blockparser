@@ -38,7 +38,7 @@ struct Rewards:public Callback
     virtual const char                   *name() const         { return "rewards"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;   }
     virtual bool                         needTXHash() const    { return true;      }
-
+    virtual bool                         needEdge() const      { return false;     }
     virtual int init(
         int argc,
         const char *argv[]

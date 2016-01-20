@@ -30,8 +30,6 @@ struct SimpleStats:public Callback
 
     virtual const char                   *name() const         { return "simpleStats"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;       }
-    virtual bool                         needTXHash() const    { return false;         }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const

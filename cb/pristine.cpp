@@ -35,7 +35,6 @@ struct Pristine:public Callback
     virtual const char                   *name() const         { return "pristine"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;    }
     virtual bool                         needTXHash() const    { return true;       }
-
     virtual int init(
         int argc,
         const char *argv[]
