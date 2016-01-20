@@ -26,6 +26,8 @@
 
         // Overload if you need parser to compute TX hashes
         virtual bool needTXHash() const {return false;}
+        // Overload if you need parser to compute Edge
+        virtual bool needEdge() const {return true;}
 
         // Callback for first, shallow parse -- all blocks are seen, including orphaned ones but aren't parsed
         virtual void startMap(const uint8_t *p){}   // a blockchain file is mapped into memory

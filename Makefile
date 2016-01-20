@@ -11,7 +11,6 @@ INC =                           \
 #        -DLITECOIN              \
 
 COPT = -pg
-
 COPT =  -g0                     \
         -O6                     \
         -m64                    \
@@ -94,12 +93,12 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpTX.cpp -o .objs/dumpTX.o
 	@mv .objs/dumpTX.d .deps
 
-.objs/dumpOut.o : cb/dumpOut.cpp
-	@echo c++ -- cb/dumpOut.cpp
+.objs/outType.o : cb/outType.cpp
+	@echo c++ -- cb/outType.cpp
 	@mkdir -p .deps
 	@mkdir -p .objs
-	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpOut.cpp -o .objs/dumpOut.o
-	@mv .objs/dumpOut.d .deps
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/outType.cpp -o .objs/outType.o
+	@mv .objs/outType.d .deps
 
 
 .objs/pristine.o : cb/pristine.cpp
@@ -201,7 +200,7 @@ OBJS=                       \
     .objs/callback.o        \
     .objs/closure.o         \
     .objs/dumpTX.o          \
-    .objs/dumpOut.o         \
+    .objs/outType.o         \
     .objs/help.o            \
     .objs/opcodes.o         \
     .objs/option.o          \

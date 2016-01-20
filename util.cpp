@@ -219,37 +219,32 @@ int get_script_type(
                     )
 {
   const uint8_t *start_p = p;
-
   const uint8_t *e = scriptSize + p;
   uint8_t last_c = 0;
   while(likely(p<e)) {
     LOAD(uint8_t, c, p);
 
-    if (p - start_p >= kRIPEMD160ByteSize) break;
-    bool isImmediate = (0<c && c<79) ;
+    if (p - start_p >= kRIPEMD160ByteSize)
+      break;
+
+    bool isImmediate = (0<c && c<79);
     if(!isImmediate) {
       type[(p - start_p)-1] = c;
+    } else {
+      uint64_t dataSize = 0;
+      if(likely(c<=75)) {                            dataSize = c; }
+      else if(likely(76==c)) { LOAD( uint8_t, v, p); dataSize = v; }
+      else if(likely(77==c)) { LOAD(uint16_t, v, p); dataSize = v; }
+      else if(likely(78==c)) { LOAD(uint32_t, v, p); dataSize = v; }
+
+      type[(p - start_p)-1] = 75;
+      start_p += dataSize;
+
+      p += dataSize;
     }
-    else
-      {
-        uint64_t dataSize = 0;
-        if(likely(c<=75)) {                       dataSize = c; }
-        else if(likely(76==c)) { LOAD( uint8_t, v, p); dataSize = v; }
-        else if(likely(77==c)) { LOAD(uint16_t, v, p); dataSize = v; }
-        else if(likely(78==c)) { LOAD(uint32_t, v, p); dataSize = v; }
-
-        type[(p - start_p)-1] = 75;
-        start_p += dataSize;
-
-        p += dataSize;
-      }
   }
   return p - start_p;
 }
-
-
-
-
 
 
 void showScript(

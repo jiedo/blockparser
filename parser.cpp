@@ -19,6 +19,7 @@ typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map TXOMap;
 typedef GoogMap<Hash256, Block*, Hash256Hasher, Hash256Equal>::Map BlockMap;
 
 static bool gNeedTXHash;
+static bool gNeedEdge;
 static Callback *gCallback;
 
 static std::vector<Map> mapVec;
@@ -155,7 +156,7 @@ static void parseOutput(
         auto outputScript = p;
         p += outputScriptSize;
 
-        if(!skip && fullContext && found) {
+        if(!skip && fullContext && gNeedEdge && found) {
              edge(
                   value,
                   txHash,
@@ -246,7 +247,7 @@ static void parseInput(
 
         auto upTXHash = p;
         const Chunk *upTX = 0;
-        if(gNeedTXHash && !skip) {
+        if(gNeedTXHash && gNeedEdge && !skip) {
             auto isGenTX = (0==memcmp(gNullHash.v, upTXHash, sizeof(gNullHash)));
             if(likely(false==isGenTX)) {
                 auto i = gTXOMap.find(upTXHash);
@@ -324,7 +325,9 @@ static void parseTX(
     auto txStart = p;
     auto txEnd = p;
     if(!skip)
-        parseTX<true>(block, txEnd);
+      // get txEnd, do nothing else
+      parseTX<true>(block, txEnd);
+
     uint8_t *txHash = 0;
     if(gNeedTXHash && !skip) {
         txHash = allocHash256();
@@ -341,7 +344,7 @@ static void parseTX(
     Chunk *txo = 0;
     size_t txoOffset = -1;
     const uint8_t *outputsStart = p;
-    if(gNeedTXHash && !skip) {
+    if(gNeedTXHash && gNeedEdge && !skip) {
       txo = Chunk::alloc();
       txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
       gTXOMap[txHash] = txo;
@@ -356,6 +359,8 @@ static void parseTX(
                 txoSize,
                 txoOffset
                 );
+    } else if (txHash) {
+      freeHash256((uint8_t*)txHash);
     }
 
     SKIP(uint32_t, lockTime, p);
@@ -461,6 +466,7 @@ static void initCallback(
         errFatal("callback init failed");
     }
     gNeedTXHash = gCallback->needTXHash();
+    gNeedEdge = gCallback->needEdge();
 }
 
 static void findBlockParent(
