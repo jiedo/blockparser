@@ -14,7 +14,7 @@
 #include <option.h>
 #include <callback.h>
 
-typedef GoogMap<Hash256, bool, Hash256Hasher, Hash256Equal >::Map ScriptMap;
+typedef GoogMap<Hash256, int, Hash256Hasher, Hash256Equal >::Map ScriptMap;
 
 
 int load_hash_data(const char*name, ScriptMap &gMap){
@@ -35,7 +35,7 @@ int load_hash_data(const char*name, ScriptMap &gMap){
     uint8_t * hash256 = allocHash256();
     memset(hash256, 0, kSHA256ByteSize);
     fromHex(hash256, (const uint8_t *)getline_buf, size, false, false);
-    gMap[hash256] = true;
+    gMap[hash256] = 0;
     n_loaded ++;
   }
   fclose(fp_in);
@@ -45,12 +45,13 @@ int load_hash_data(const char*name, ScriptMap &gMap){
   return n_loaded;
 }
 
-struct DumpRscript:public Callback
+struct ConfirmDupRP:public Callback
 {
      optparse::OptionParser parser;
 
-     ScriptMap gRscriptMap;
-     ScriptMap gPublicKeyMap;
+     ScriptMap gRMap;
+     ScriptMap gQMap;
+     ScriptMap gPublicKeyXMap;
 
      const uint8_t *txStart;
      uint64_t currTXSize;
@@ -59,43 +60,50 @@ struct DumpRscript:public Callback
      uint64_t currBlock;
      uint64_t bTime;
      uint64_t nbBadR;
-     uint64_t nbBadP;
+     uint64_t nbBadP_aleady_in_R;
+     uint64_t nbBadR_aleady_in_P;
 
-     DumpRscript()
+     ConfirmDupRP()
           {
                parser
                     .usage("")
                     .version("")
-                    .description("find all dumprscript blocks in the blockchain")
+                    .description("find all confirmDupRP blocks in the blockchain")
                     .epilog("")
                     ;
           }
 
-     virtual const char                   *name() const         { return "rscript"; }
+     virtual const char                   *name() const         { return "confirmrp"; }
      virtual const optparse::OptionParser *optionParser() const { return &parser;    }
      virtual bool                         needTXHash() const    { return true;       }
      virtual void aliases(
           std::vector<const char*> &v
           ) const {
-          v.push_back("rscript");
+          v.push_back("confirmrp");
      }
 
      virtual int init(
           int argc,
           const char *argv[]
           ) {
-          info("Finding all dumprscript blocks in blockchain");
+          info("Finding all confirmDupRP blocks in blockchain");
           static uint8_t empty[kSHA256ByteSize] = { 0x42 };
-          static uint64_t sz = 15 * 1000;
-          gRscriptMap.setEmptyKey(empty);
-          load_hash_data("rscript.data", gRscriptMap);
-          gRscriptMap.resize(sz);
+          static uint64_t sz = 1000;
+          gRMap.setEmptyKey(empty);
+          load_hash_data("r.data", gRMap);
+          gRMap.resize(sz);
 
-          gPublicKeyMap.setEmptyKey(empty);
-          load_hash_data("publickey.data", gPublicKeyMap);
-          gPublicKeyMap.resize(sz);
-          nbBadP = 0;
+          gQMap.setEmptyKey(empty);
+          load_hash_data("q.data", gQMap);
+          gQMap.resize(sz);
+
+          gPublicKeyXMap.setEmptyKey(empty);
+          load_hash_data("p.data", gPublicKeyXMap);
+          gPublicKeyXMap.resize(sz);
+
           nbBadR = 0;
+          nbBadP_aleady_in_R = 0;
+          nbBadR_aleady_in_P = 0;
           return 0;
      }
 
@@ -191,53 +199,54 @@ struct DumpRscript:public Callback
                     int iscanonicalpubkey = IsCanonicalPubKey(p, dataSize);
                     if (iscanonicalpubkey == 0) // ok
                       {
-                        auto i = gPublicKeyMap.find(&p[1]);
-                        if(unlikely(gPublicKeyMap.end()!=i)) {
-                          showHex(outputScript, outputScriptSize, false);
-                          printf(" P %ld %ld %ld ",
-                                 outputIndex,
-                                 inputIndex,
-                                 bTime
-                                 );
-                          showHex(txStart, currTXSize, false);
-                          printf("\n");
-                          nbBadP++;
-                          fflush(stdout);
-                        }
+                        auto i = gQMap.find(&p[1]);
+                        if(unlikely(gQMap.end()!=i)) {
+                           showHex(&p[1], kSHA256ByteSize, false);
+                           printf(" Q\n");
+                           nbBadR_aleady_in_P++;
+                           fflush(stdout);
+                         }
                       }
 
                     int iscanonicalsignature = IsCanonicalSignature(p, dataSize);
                     if (iscanonicalsignature == 0) // ok
                     {
-                         unsigned int nLenR = p[3];
-                         unsigned int nLenS = p[5+nLenR];
-                         const uint8_t *R = &p[4];
-                         const uint8_t *S = &p[6+nLenR];
+                      unsigned int n_length_r = p[3];
+                      unsigned int n_length_s = p[5+n_length_r];
+                      const uint8_t *data_r = &p[4];
+                      const uint8_t *S = &p[6+n_length_r];
 
-                         const uint8_t *rscript;
-                         uint256_t rscript_h256;
-                         if (unlikely(nLenR > kSHA256ByteSize)) {
-                           rscript = &(R[nLenR-kSHA256ByteSize]);
-                           //memcpy(rscript, &(R[nLenR-kSHA256ByteSize]), kSHA256ByteSize);
-                         }
-                         else {
-                              memset(rscript_h256.v, 0, kSHA256ByteSize);
-                              memcpy(rscript_h256.v, R, nLenR);
-                              rscript = (const uint8_t *)(&(rscript_h256.v));
-                         }
-                         auto i = gRscriptMap.find(rscript);
-                         if(unlikely(gRscriptMap.end()!=i)) {
-                              showHex(outputScript, outputScriptSize, false);
-                              printf(" R %ld %ld %ld ",
-                                     outputIndex,
-                                     inputIndex,
-                                     bTime
-                                   );
-                              showHex(txStart, currTXSize, false);
-                              printf("\n");
-                              nbBadR++;
-                              fflush(stdout);
-                         }
+                      uint256_t rscript_h256;
+
+                      const uint8_t *rscript = data_r;
+                      int offset = n_length_r - kSHA256ByteSize;
+                      if (unlikely(offset > 0)) {
+                        rscript += offset;
+                      } else {
+                        memset(rscript_h256.v, 0, kSHA256ByteSize);
+                        memcpy(rscript_h256.v, data_r, n_length_r);
+                        rscript = (const uint8_t *)(&(rscript_h256.v));
+                      }
+
+                      auto i = gPublicKeyXMap.find(rscript);
+                      if(unlikely(gPublicKeyXMap.end()!=i)) {
+                        showHex(rscript, kSHA256ByteSize, false);
+                        printf(" P\n");
+                        nbBadP_aleady_in_R++;
+                        fflush(stdout);
+                      }
+
+                      auto i_r = gRMap.find(rscript);
+                      if(unlikely(gRMap.end()!=i_r)) {
+                        if (i_r->second > 0) {
+                          showHex(rscript, kSHA256ByteSize, false);
+                          printf(" R\n");
+                          nbBadR++;
+                          fflush(stdout);
+                        } else {
+                          i_r->second += 1;
+                        }
+                      }
                     }
                     p += dataSize;
                }
@@ -246,8 +255,9 @@ struct DumpRscript:public Callback
 
      virtual void wrapup()
           {
-            info("Found %ld dup R. %ld Bad R(by public key used)\n", nbBadR, nbBadP);
+            info("Found %ld dup R. %ld Bad R(leak by Public key use).  %ld Bad R(Public key aready used).\n",
+                 nbBadR, nbBadP_aleady_in_R, nbBadR_aleady_in_P);
           }
 };
 
-static DumpRscript dumprscript;
+static ConfirmDupRP confirmDupRP;

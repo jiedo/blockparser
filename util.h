@@ -249,6 +249,9 @@
 
     };
 
+
+#define WANT_DENSE
+
     #if defined(WANT_DENSE)
 
         // Faster, uses more RAM

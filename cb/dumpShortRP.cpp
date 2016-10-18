@@ -1,5 +1,4 @@
-
-// find duplicate r, and find bad r(by public key used). then print it out
+// Find duplicate r, and find bad r(by public key used). then print it out
 
 #include <util.h>
 #include <string.h>
@@ -8,21 +7,28 @@
 #include <option.h>
 #include <callback.h>
 
+#include "bloom.h"
+
 typedef GoogMap<Hash64, bool, Hash64Hasher, Hash64Equal >::Map RscriptMap;
 
 struct DumpShortRP:public Callback
 {
      optparse::OptionParser parser;
 
-     RscriptMap rscriptMap;
+  struct bloom bloom_rscript;
+  struct bloom bloom_publickey;
+
+     // RscriptMap gRscriptMap;
+     // RscriptMap gPublicKeyMap;
+
      const uint8_t *txStart;
      uint64_t currTXSize;
 
      uint64_t currTX;
      uint64_t currBlock;
-     uint64_t bTime;
      uint64_t nbBadR;
-     uint64_t nbBadP;
+     uint64_t nbBadP_aleady_in_R;
+     uint64_t nbBadR_aleady_in_P;
 
      DumpShortRP()
           {
@@ -34,26 +40,37 @@ struct DumpShortRP:public Callback
                     ;
           }
 
-     virtual const char                   *name() const         { return "rpshort"; }
+     virtual const char                   *name() const         { return "rpq"; }
      virtual const optparse::OptionParser *optionParser() const { return &parser;    }
      virtual void aliases(
           std::vector<const char*> &v
           ) const {
-          v.push_back("rpshort");
+          v.push_back("rpq");
      }
 
      virtual int init(
           int argc,
           const char *argv[]
           ) {
-          info("Finding all dumpshortrp blocks in blockchain");
-          static uint8_t empty[kSHA64ByteSize] = { 0x42 };
-          static uint64_t sz = 15 * 1000 * 1000;
-          rscriptMap.setEmptyKey(empty);
-          rscriptMap.resize(sz);
 
-          nbBadP = 0;
+       const unsigned long int num_bloom = 2800000000L;
+       int is_ok_rscript = bloom_init(&bloom_rscript,     num_bloom, 0.00002);
+       int is_ok_publickey = bloom_init(&bloom_publickey, num_bloom, 0.00002);
+
+       info("init bloom filter rscript[%ld]=%d, bloom filter publickey[%ld]=%d.\n",
+            bloom_rscript.bytes, is_ok_rscript, bloom_publickey.bytes, is_ok_publickey);
+
+          // static uint8_t empty[kSHA64ByteSize] = { 0x42 };
+          // static uint64_t sz = 15 * 1000 * 1000;
+          // gRscriptMap.setEmptyKey(empty);
+          // gRscriptMap.resize(sz);
+
+          // gPublicKeyMap.setEmptyKey(empty);
+          // gPublicKeyMap.resize(sz);
+
           nbBadR = 0;
+          nbBadP_aleady_in_R = 0;
+          nbBadR_aleady_in_P = 0;
           return 0;
      }
 
@@ -67,7 +84,6 @@ struct DumpShortRP:public Callback
           SKIP(uint256_t, blkMerkleRoot, p);
           LOAD(uint32_t, blkTime, p);
 
-          bTime = blkTime;
           currBlock = b->height;
           currTX = 0;
 
@@ -89,7 +105,7 @@ struct DumpShortRP:public Callback
             double elasedSinceStart = 1e-6*(now - startTime);
             double speed = progress / elasedSinceStart;
             info(
-                "%8" PRIu64 " blocks, "
+                "%8ld blocks, "
                 "%6.2f%% , "
                 "elapsed = %5.2fs , "
                 "eta = %5.2fs"
@@ -144,56 +160,48 @@ struct DumpShortRP:public Callback
                     int iscanonicalpubkey = IsCanonicalPubKey(p, dataSize);
                     if (iscanonicalpubkey == 0) // ok
                       {
-                        uint8_t *publickeyx = allocHash64();
-                        memcpy(publickeyx, p+1, kSHA64ByteSize);
 
-                        auto i = rscriptMap.find(publickeyx);
-                        if(likely(rscriptMap.end()==i)) {
-                          showHex(publickeyx, 8, false);
+                        const uint8_t *publickeyx = p+1;
+                        if (unlikely(bloom_check(&bloom_rscript, (void*)publickeyx, kSHA256ByteSize))) {
+                          showHex(publickeyx, kSHA256ByteSize, false);
                           printf(" P\n");
-                          nbBadP++;
+                          nbBadP_aleady_in_R++;
                           fflush(stdout);
-                          rscriptMap[publickeyx] = true;
-                        }else{
-                          freeHash64(publickeyx);
                         }
+                        bloom_add(&bloom_publickey, (void*)publickeyx, kSHA256ByteSize);
+
                       }
 
                     int iscanonicalsignature = IsCanonicalSignature(p, dataSize);
                     if (iscanonicalsignature == 0) // ok
                     {
-                         unsigned int nLenR = p[3];
-                         unsigned int nLenS = p[5+nLenR];
-                         const uint8_t *R = &p[4];
-                         const uint8_t *S = &p[6+nLenR];
+                      unsigned int n_length_r = p[3];
+                      unsigned int n_length_s = p[5+n_length_r];
+                      const uint8_t *data_r = &p[4];
+                      const uint8_t *S = &p[6+n_length_r];
 
-                         uint8_t *rscript = allocHash64();
-                         if (unlikely(nLenR > kSHA256ByteSize)) {
-                           memcpy(rscript, &(R[nLenR-kSHA256ByteSize]), kSHA64ByteSize);
-                         }
-                         else if (unlikely(nLenR < kSHA256ByteSize)) {
-                           unsigned int offset = kSHA256ByteSize - nLenR;
-                           if (kSHA64ByteSize > offset) {
-                             memset(rscript, 0, offset);
-                             memcpy(rscript + offset, R, kSHA64ByteSize-offset);
-                           }else{
-                             memset(rscript, 0, kSHA64ByteSize);
-                           }
-                         }
-                         else {
-                           memcpy(rscript, R, kSHA64ByteSize);
-                         }
+                      const uint8_t *rscript = data_r;
 
-                         auto i = rscriptMap.find(rscript);
-                         if(likely(rscriptMap.end()==i)) {
-                           showHex(rscript, 8, false);
-                           printf(" R\n");
-                           nbBadR++;
-                           fflush(stdout);
-                           rscriptMap[rscript] = true;
-                         }else{
-                           freeHash64(rscript);
-                         }
+                      int offset = n_length_r - kSHA256ByteSize;
+                      if (unlikely(offset > 0)) {
+                        rscript =  &(data_r[offset]);
+                        offset = 0;
+                      }
+                      offset += kSHA256ByteSize;
+
+                      if (unlikely(bloom_check(&bloom_publickey, (void*)rscript, offset))) {
+                        showHex(rscript, offset, false);
+                        printf(" Q\n");
+                        nbBadR_aleady_in_P++;
+                        fflush(stdout);
+                      }
+
+                      if (unlikely(bloom_add(&bloom_rscript, (void*)rscript, offset))) {
+                        showHex(rscript, offset, false);
+                        printf(" R\n");
+                        nbBadR++;
+                        fflush(stdout);
+                      }
                     }
                     p += dataSize;
                }
@@ -202,7 +210,8 @@ struct DumpShortRP:public Callback
 
      virtual void wrapup()
           {
-            info("Found %" PRIu64 " dup R. %" PRIu64 " Bad R(by public key used)\n", nbBadR, nbBadP);
+            info("Found %ld dup R. %ld Bad R(leak by Public key use).  %ld Bad R(Public key aready used).\n",
+                 nbBadR, nbBadP_aleady_in_R, nbBadR_aleady_in_P);
           }
 };
 

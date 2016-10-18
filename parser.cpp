@@ -718,7 +718,7 @@ static void initHashtables() {
         gChainSize += map.size;
     }
 
-    auto txPerBytes = (52149122.0 / 26645195995.0);
+    auto txPerBytes = (13141592.6 / 26645195995.0);
     auto nbTxEstimate = (size_t)(1.1 * txPerBytes * gChainSize);
     gTXOMap.resize(nbTxEstimate);
 
@@ -749,7 +749,7 @@ static void makeBlockMaps() {
     auto fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
     while(1) {
 
-      // if(220<blkDatId) {
+      // if(1<blkDatId) {
       //   break;
       // }
 

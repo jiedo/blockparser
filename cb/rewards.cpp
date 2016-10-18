@@ -116,7 +116,7 @@ struct Rewards:public Callback
             outputScriptSize,
             addrType
         );
-        if(unlikely(-2==type)) return;
+        // if(unlikely(-2==type)) return;
         reward += value;
         if(!fullDump) return;
 
@@ -128,7 +128,7 @@ struct Rewards:public Callback
             showScript(outputScript, outputScriptSize);
             printf("============================\n\n");
             printf("\n");
-            errFatal("invalid script");
+            //errFatal("invalid script");
         }
 
         printf("%7d ", (int)currBlock);
@@ -177,7 +177,7 @@ struct Rewards:public Callback
         uint64_t baseReward = getBaseReward(currBlock);
         int64_t feesEarned = reward - (int64_t)baseReward;   // This sometimes goes <0 for some early, buggy blocks
         printf(
-            "Summary for block %7d : baseReward=%16.8f fees=%16.8f total=%16.8f\n",
+            "block %7d: baseReward=%-3.8f fees=%-3.8f total=%-3.8f\n",
             (int)currBlock,
             1e-8*baseReward,
             1e-8*feesEarned,

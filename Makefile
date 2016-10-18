@@ -11,8 +11,9 @@ INC =                           \
 #        -DLITECOIN              \
 
 COPT = -pg
-COPT =  -g0                     \
-        -O6                     \
+       # -O6
+
+COPT =  -O6                     \
         -m64                    \
         -Wall                   \
         -msse3                  \
@@ -30,14 +31,17 @@ COPT =  -g0                     \
         -Wno-variadic-macros    \
         -Wno-unused-variable    \
         -Wno-unused-parameter   \
-        -fomit-frame-pointer    \
 
+#        -fomit-frame-pointer    \
+
+LOPT = -s -pg
 LOPT = -pg
-LOPT = -s
+LOPT = -s -L.
 
 LIBS =                          \
     -lcrypto                    \
     -ldl                        \
+    -lbloom                    \
 
 all:parser
 
@@ -58,12 +62,20 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/allBalances.cpp -o .objs/allBalances.o
 	@mv .objs/allBalances.d .deps
 
-.objs/dumpShortDupR.o : cb/dumpShortDupR.cpp
-	@echo c++ -- cb/dumpShortDupR.cpp
+
+.objs/confirmDupRP.o : cb/confirmDupRP.cpp
+	@echo c++ -- cb/confirmDupRP.cpp
 	@mkdir -p .deps
 	@mkdir -p .objs
-	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpShortDupR.cpp -o .objs/dumpShortDupR.o
-	@mv .objs/dumpShortDupR.d .deps
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/confirmDupRP.cpp -o .objs/confirmDupRP.o
+	@mv .objs/confirmDupRP.d .deps
+
+.objs/statusR.o : cb/statusR.cpp
+	@echo c++ -- cb/statusR.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/statusR.cpp -o .objs/statusR.o
+	@mv .objs/statusR.d .deps
 
 .objs/dumpShortRP.o : cb/dumpShortRP.cpp
 	@echo c++ -- cb/dumpShortRP.cpp
@@ -194,7 +206,8 @@ all:parser
 
 OBJS=                       \
     .objs/allBalances.o     \
-    .objs/dumpShortDupR.o   \
+    .objs/confirmDupRP.o   \
+    .objs/statusR.o   \
     .objs/dumpShortRP.o     \
     .objs/dumpRscript.o     \
     .objs/callback.o        \
@@ -214,6 +227,7 @@ OBJS=                       \
     .objs/taint.o           \
     .objs/transactions.o    \
     .objs/util.o            \
+
 
 parser:${OBJS}
 	@echo lnk -- parser
