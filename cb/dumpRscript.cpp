@@ -2,7 +2,7 @@
 // print tx detail about specific r
 // need:
 //     rscript.data
-//     publickey.data
+//     publickeyx.data
 
 // ./parse rscript > results
 //
@@ -50,16 +50,16 @@ struct DumpRscript:public Callback
      optparse::OptionParser parser;
 
      ScriptMap gRscriptMap;
-     ScriptMap gPublicKeyMap;
+     ScriptMap gPublicKeyXMap;
 
      const uint8_t *txStart;
      uint64_t currTXSize;
 
      uint64_t currTX;
-     uint64_t currBlock;
      uint64_t bTime;
      uint64_t nbBadR;
      uint64_t nbBadP;
+  bool is_currTX_dumped = false;
 
      DumpRscript()
           {
@@ -72,8 +72,8 @@ struct DumpRscript:public Callback
           }
 
      virtual const char                   *name() const         { return "rscript"; }
-     virtual const optparse::OptionParser *optionParser() const { return &parser;    }
-     virtual bool                         needTXHash() const    { return true;       }
+     virtual const optparse::OptionParser *optionParser() const { return &parser;   }
+     virtual bool                         needTXHash() const    { return true;     }
      virtual void aliases(
           std::vector<const char*> &v
           ) const {
@@ -91,9 +91,9 @@ struct DumpRscript:public Callback
           load_hash_data("rscript.data", gRscriptMap);
           gRscriptMap.resize(sz);
 
-          gPublicKeyMap.setEmptyKey(empty);
-          load_hash_data("publickey.data", gPublicKeyMap);
-          gPublicKeyMap.resize(sz);
+          gPublicKeyXMap.setEmptyKey(empty);
+          load_hash_data("publickeyx.data", gPublicKeyXMap);
+          gPublicKeyXMap.resize(sz);
           nbBadP = 0;
           nbBadR = 0;
           return 0;
@@ -111,41 +111,7 @@ struct DumpRscript:public Callback
           LOAD(uint32_t, blkTime, p);
 
           bTime = blkTime;
-          currBlock = b->height;
           currTX = 0;
-
-        static double startTime = 0;
-        static double lastStatTime = 0;
-        static uint64_t offset = 0;
-
-        offset += b->chunk->getSize();
-        double now = usecs();
-        double elapsed = now - lastStatTime;
-        bool longEnough = (5*1000*1000<elapsed);
-        bool closeEnough = ((chainSize - offset)<80);
-        if(unlikely(longEnough || closeEnough)) {
-            if(0==startTime) {
-                startTime = now;
-            }
-
-            double progress = offset/(double)chainSize;
-            double elasedSinceStart = 1e-6*(now - startTime);
-            double speed = progress / elasedSinceStart;
-            info(
-                "%8ld blocks, "
-                "%6.2f%% , "
-                "elapsed = %5.2fs , "
-                "eta = %5.2fs"
-                ,
-                currBlock,
-                100.0*progress,
-                elasedSinceStart,
-                (1.0/speed) - elasedSinceStart
-            );
-
-            lastStatTime = now;
-        }
-
      }
 
      virtual void startTX(
@@ -156,21 +122,20 @@ struct DumpRscript:public Callback
           txStart = p;
           currTXSize = txEnd - txStart;
           currTX++;
+          is_currTX_dumped = false;
      }
 
-
-     virtual void edge(
-          uint64_t      value,
-          const uint8_t *upTXHash,
-          uint64_t      outputIndex,
-          const uint8_t *outputScript,
-          uint64_t      outputScriptSize,
-          const uint8_t *downTXHash,
-          uint64_t      inputIndex,
-          const uint8_t *inputScript,
-          uint64_t      inputScriptSize
-          ) {
-
+    virtual void edge(
+        uint64_t      value,
+        const uint8_t *upTXHash,
+        uint64_t      outputIndex,
+        const uint8_t *outputScript,
+        uint64_t      outputScriptSize,
+        const uint8_t *downTXHash,
+        uint64_t      inputIndex,
+        const uint8_t *inputScript,
+        uint64_t      inputScriptSize
+    ) {
           const uint8_t *p = inputScript;
           const uint8_t *e = p + (size_t)inputScriptSize;
 
@@ -191,15 +156,18 @@ struct DumpRscript:public Callback
                     int iscanonicalpubkey = IsCanonicalPubKey(p, dataSize);
                     if (iscanonicalpubkey == 0) // ok
                       {
-                        auto i = gPublicKeyMap.find(&p[1]);
-                        if(unlikely(gPublicKeyMap.end()!=i)) {
+                        auto i = gPublicKeyXMap.find(&p[1]);
+                        if(unlikely(gPublicKeyXMap.end()!=i)) {
                           showHex(outputScript, outputScriptSize, false);
                           printf(" P %ld %ld %ld ",
                                  outputIndex,
                                  inputIndex,
                                  bTime
                                  );
-                          showHex(txStart, currTXSize, false);
+                          if (!is_currTX_dumped) {
+                            showHex(txStart, currTXSize, false);
+                            is_currTX_dumped = true;
+                          }
                           printf("\n");
                           nbBadP++;
                           fflush(stdout);
@@ -227,13 +195,16 @@ struct DumpRscript:public Callback
                          }
                          auto i = gRscriptMap.find(rscript);
                          if(unlikely(gRscriptMap.end()!=i)) {
-                              showHex(outputScript, outputScriptSize, false);
+                           showHex(outputScript, outputScriptSize, false);
                               printf(" R %ld %ld %ld ",
                                      outputIndex,
                                      inputIndex,
                                      bTime
                                    );
-                              showHex(txStart, currTXSize, false);
+                              if (!is_currTX_dumped) {
+                                showHex(txStart, currTXSize, false);
+                                is_currTX_dumped = true;
+                              }
                               printf("\n");
                               nbBadR++;
                               fflush(stdout);

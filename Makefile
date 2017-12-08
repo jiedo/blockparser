@@ -52,16 +52,12 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c callback.cpp -o .objs/callback.o
 	@mv .objs/callback.d .deps
 
-
-
-
 .objs/allBalances.o : cb/allBalances.cpp
 	@echo c++ -- cb/allBalances.cpp
 	@mkdir -p .deps
 	@mkdir -p .objs
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/allBalances.cpp -o .objs/allBalances.o
 	@mv .objs/allBalances.d .deps
-
 
 .objs/confirmDupRP.o : cb/confirmDupRP.cpp
 	@echo c++ -- cb/confirmDupRP.cpp
@@ -111,6 +107,13 @@ all:parser
 	@mkdir -p .objs
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/outType.cpp -o .objs/outType.o
 	@mv .objs/outType.d .deps
+
+.objs/inType.o : cb/inType.cpp
+	@echo c++ -- cb/inType.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/inType.cpp -o .objs/inType.o
+	@mv .objs/inType.d .deps
 
 
 .objs/pristine.o : cb/pristine.cpp
@@ -214,6 +217,7 @@ OBJS=                       \
     .objs/closure.o         \
     .objs/dumpTX.o          \
     .objs/outType.o         \
+    .objs/inType.o         \
     .objs/help.o            \
     .objs/opcodes.o         \
     .objs/option.o          \

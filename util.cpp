@@ -259,7 +259,7 @@ void showScript(
     indent = indent ? indent : "";
     uint8_t last_c = 0;
 
-    printf("    ScriptHex: ");
+    printf("ScriptHex: ");
     showHex(p, scriptSize, false);
     while(likely(p<e)) {
         LOAD(uint8_t, c, p);
@@ -589,7 +589,6 @@ bool addrToHash160(
     static BN_CTX *ctx = 0;
     if(unlikely(!ctx)) {
         ctx = BN_CTX_new();
-        BN_CTX_init(ctx);
         sum = BN_new();
     }
 
@@ -708,8 +707,6 @@ void hash160ToAddr(
     if(!ctx)
     {
         ctx = BN_CTX_new();
-        BN_CTX_init(ctx);
-
         b58 = BN_new();
         num = BN_new();
         div = BN_new();

@@ -22,10 +22,8 @@ struct DumpShortRP:public Callback
      // RscriptMap gPublicKeyMap;
 
      const uint8_t *txStart;
-     uint64_t currTXSize;
 
      uint64_t currTX;
-     uint64_t currBlock;
      uint64_t nbBadR;
      uint64_t nbBadP_aleady_in_R;
      uint64_t nbBadR_aleady_in_P;
@@ -84,41 +82,7 @@ struct DumpShortRP:public Callback
           SKIP(uint256_t, blkMerkleRoot, p);
           LOAD(uint32_t, blkTime, p);
 
-          currBlock = b->height;
           currTX = 0;
-
-        static double startTime = 0;
-        static double lastStatTime = 0;
-        static uint64_t offset = 0;
-
-        offset += b->chunk->getSize();
-        double now = usecs();
-        double elapsed = now - lastStatTime;
-        bool longEnough = (5*1000*1000<elapsed);
-        bool closeEnough = ((chainSize - offset)<80);
-        if(unlikely(longEnough || closeEnough)) {
-            if(0==startTime) {
-                startTime = now;
-            }
-
-            double progress = offset/(double)chainSize;
-            double elasedSinceStart = 1e-6*(now - startTime);
-            double speed = progress / elasedSinceStart;
-            info(
-                "%8ld blocks, "
-                "%6.2f%% , "
-                "elapsed = %5.2fs , "
-                "eta = %5.2fs"
-                ,
-                currBlock,
-                100.0*progress,
-                elasedSinceStart,
-                (1.0/speed) - elasedSinceStart
-            );
-
-            lastStatTime = now;
-        }
-
      }
 
      virtual void startTX(
@@ -127,7 +91,6 @@ struct DumpShortRP:public Callback
           const uint8_t *txEnd
           ) {
           txStart = p;
-          currTXSize = txEnd - txStart;
           currTX++;
      }
 

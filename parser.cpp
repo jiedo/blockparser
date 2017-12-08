@@ -39,26 +39,31 @@ static uint64_t gChainSize;
 static uint256_t gNullHash;
 
 #if defined BITCOIN
-    static const size_t gHeaderSize = 80;
-    static auto gCoinDirName = "/.bitcoin/";
-    static const uint32_t gExpectedMagic = 0xd9b4bef9;
+static const size_t gHeaderSize = 80;
+static auto gCoinDirName = "/.bitcoin/";
+static const uint32_t gExpectedMagic = 0xd9b4bef9;
 #endif
 
 #define DO(x) x
-    static inline void   startBlock(const uint8_t *p)                      { DO(gCallback->startBlock(p));    }
-    static inline void     endBlock(const uint8_t *p)                      { DO(gCallback->endBlock(p));      }
-    static inline void     startTXs(const uint8_t *p)                      { DO(gCallback->startTXs(p));      }
-    static inline void       endTXs(const uint8_t *p)                      { DO(gCallback->endTXs(p));        }
-    static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd){DO(gCallback->startTX(p,hash, txEnd));}
-    static inline void        endTX(const uint8_t *p)                      { DO(gCallback->endTX(p));         }
-    static inline void  startInputs(const uint8_t *p)                      { DO(gCallback->startInputs(p));   }
-    static inline void    endInputs(const uint8_t *p)                      { DO(gCallback->endInputs(p));     }
-    static inline void   startInput(const uint8_t *p)                      { DO(gCallback->startInput(p));    }
+static inline void   startBlock(const uint8_t *p)                      { DO(gCallback->startBlock(p));    }
+static inline void     endBlock(const uint8_t *p)                      { DO(gCallback->endBlock(p));      }
+static inline void     startTXs(const uint8_t *p)                      { DO(gCallback->startTXs(p));      }
+static inline void       endTXs(const uint8_t *p)                      { DO(gCallback->endTXs(p));        }
+static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd){DO(gCallback->startTX(p,hash, txEnd));}
+static inline void        endTX(const uint8_t *p)                      { DO(gCallback->endTX(p));         }
+static inline void  startInputs(const uint8_t *p)                      { DO(gCallback->startInputs(p));   }
+static inline void    endInputs(const uint8_t *p)                      { DO(gCallback->endInputs(p));     }
+static inline void   startInput(const uint8_t *p)                      { DO(gCallback->startInput(p));    }
 //static inline void     endInput(const uint8_t *p)                      { DO(gCallback->endInput(p));      }
-    static inline void startOutputs(const uint8_t *p)                      { DO(gCallback->startOutputs(p));  }
-    static inline void   endOutputs(const uint8_t *p)                      { DO(gCallback->endOutputs(p));    }
-    static inline void  startOutput(const uint8_t *p)                      { DO(gCallback->startOutput(p));   }
-    static inline void        start(const Block *s, const Block *e)        { DO(gCallback->start(s, e));      }
+
+static inline void  startWitnesses(const uint8_t *p)                      { DO(gCallback->startWitnesses(p));   }
+static inline void    endWitnesses(const uint8_t *p)                      { DO(gCallback->endWitnesses(p));     }
+static inline void   startWitness(const uint8_t *p)                      { DO(gCallback->startWitness(p));    }
+
+static inline void startOutputs(const uint8_t *p)                      { DO(gCallback->startOutputs(p));  }
+static inline void   endOutputs(const uint8_t *p)                      { DO(gCallback->endOutputs(p));    }
+static inline void  startOutput(const uint8_t *p)                      { DO(gCallback->startOutput(p));   }
+static inline void        start(const Block *s, const Block *e)        { DO(gCallback->start(s, e));      }
 #undef DO
 
 static inline void     startMap(const uint8_t *p) { gCallback->startMap(p);               }
@@ -73,7 +78,7 @@ static inline void endOutput(
     uint64_t      outputIndex,
     const uint8_t *outputScript,
     uint64_t      outputScriptSize
-) {
+    ) {
     gCallback->endOutput(
         p,
         value,
@@ -81,27 +86,27 @@ static inline void endOutput(
         outputIndex,
         outputScript,
         outputScriptSize
-    );
+        );
 }
 
 static inline void endInput(
-                            const uint8_t *pend,
-                            const uint8_t *upTXHash,
-                            uint64_t      outputIndex,
-                            const uint8_t *downTXHash,
-                            uint64_t      inputIndex,
-                            const uint8_t *inputScript,
-                            uint64_t      inputScriptSize
-) {
+    const uint8_t *pend,
+    const uint8_t *upTXHash,
+    uint64_t      outputIndex,
+    const uint8_t *downTXHash,
+    uint64_t      inputIndex,
+    const uint8_t *inputScript,
+    uint64_t      inputScriptSize
+    ) {
     gCallback->endInput(
-                        pend,
-                        upTXHash,
-                        outputIndex,
-                        downTXHash,
-                        inputIndex,
-                        inputScript,
-                        inputScriptSize
-                        );
+        pend,
+        upTXHash,
+        outputIndex,
+        downTXHash,
+        inputIndex,
+        inputScript,
+        inputScriptSize
+        );
 }
 
 static inline void edge(
@@ -114,7 +119,7 @@ static inline void edge(
     uint64_t      inputIndex,
     const uint8_t *inputScript,
     uint64_t      inputScriptSize
-) {
+    ) {
     gCallback->edge(
         value,
         upTXHash,
@@ -125,16 +130,11 @@ static inline void edge(
         inputIndex,
         inputScript,
         inputScriptSize
-    );
+        );
 }
 
 
-
-
-template<
-    bool skip,
-    bool fullContext
->
+template<bool skip, bool fullContext>
 static void parseOutput(
     const uint8_t *&p,
     const uint8_t *txHash,
@@ -145,39 +145,40 @@ static void parseOutput(
     uint64_t      downInputScriptSize,
     bool          found = false,
     uint64_t      nbOutputs = 1
-) {
+    ) {
     if(!skip && !fullContext) {
         startOutput(p);
     }
 
-        LOAD(uint64_t, value, p);
-        LOAD_VARINT(outputScriptSize, p);
+    LOAD(uint64_t, value, p);
+    LOAD_VARINT(outputScriptSize, p);
 
-        auto outputScript = p;
-        p += outputScriptSize;
+    auto outputScript = p;
+    p += outputScriptSize;
 
-        if(!skip && fullContext && gNeedEdge && found) {
-             edge(
-                  value,
-                  txHash,
-                  outputIndex,
-                  outputScript,
-                  outputScriptSize,
-                  downTXHash,
-                  downInputIndex,
-                  downInputScript,
-                  downInputScriptSize
-                  );
+    if(!skip && fullContext && gNeedEdge && found) {
+        edge(
+            value,
+            txHash,
+            outputIndex,
+            outputScript,
+            outputScriptSize,
+            downTXHash,
+            downInputIndex,
+            downInputScript,
+            downInputScriptSize
+            );
 
-             auto i = giCurTXOMap;
-             if (nbOutputs == (++(i->second->count)))
-             {
-                  freeHash256((uint8_t*)i->first);
-                  Chunk::release(i->second);
-                  gTXOMap.erase(i);
-                  g_n_tx_reuse++;
-             }
-        }
+        auto i = giCurTXOMap;
+        if (nbOutputs == (++(i->second->count)))
+            {
+                freeHash256((uint8_t*)i->first);
+                i->second->releaseData();
+                Chunk::release(i->second);
+                gTXOMap.erase(i);
+                g_n_tx_reuse++;
+            }
+    }
 
     if(!skip && !fullContext) {
         endOutput(
@@ -187,14 +188,11 @@ static void parseOutput(
             outputIndex,
             outputScript,
             outputScriptSize
-        );
+            );
     }
 }
 
-template<
-    bool skip,
-    bool fullContext
->
+template<bool skip, bool fullContext>
 static void parseOutputs(
     const uint8_t *&p,
     const uint8_t *txHash,
@@ -203,29 +201,29 @@ static void parseOutputs(
     uint64_t      downInputIndex = 0,
     const uint8_t *downInputScript = 0,
     uint64_t      downInputScriptSize = 0
-) {
+    ) {
     if(!skip && !fullContext) {
         startOutputs(p);
     }
 
-        LOAD_VARINT(nbOutputs, p);
-        for(uint64_t outputIndex=0; outputIndex<nbOutputs; ++outputIndex) {
-            auto found = (fullContext && !skip && (stopAtIndex==outputIndex));
-            parseOutput<skip, fullContext>(
-                p,
-                txHash,
-                outputIndex,
-                downTXHash,
-                downInputIndex,
-                downInputScript,
-                downInputScriptSize,
-                found,
-                nbOutputs
+    LOAD_VARINT(nbOutputs, p);
+    for(uint64_t outputIndex=0; outputIndex<nbOutputs; ++outputIndex) {
+        auto found = (fullContext && !skip && (stopAtIndex==outputIndex));
+        parseOutput<skip, fullContext>(
+            p,
+            txHash,
+            outputIndex,
+            downTXHash,
+            downInputIndex,
+            downInputScript,
+            downInputScriptSize,
+            found,
+            nbOutputs
             );
-            if(found) {
-                break;
-            }
+        if(found) {
+            break;
         }
+    }
 
     if(!skip && !fullContext) {
         endOutputs(p);
@@ -234,73 +232,66 @@ static void parseOutputs(
 
 template<
     bool skip
->
+    >
 static void parseInput(
     const Block   *block,
     const uint8_t *&p,
     const uint8_t *txHash,
     uint64_t      inputIndex
-) {
+    ) {
     if(!skip) {
         startInput(p);
     }
 
-        auto upTXHash = p;
-        const Chunk *upTX = 0;
-        if(gNeedTXHash && gNeedEdge && !skip) {
-            auto isGenTX = (0==memcmp(gNullHash.v, upTXHash, sizeof(gNullHash)));
-            if(likely(false==isGenTX)) {
-                auto i = gTXOMap.find(upTXHash);
-                if(unlikely(gTXOMap.end()==i)) {
-                    errFatal("failed to locate upstream transaction");
-                }
-                upTX = i->second;
-                giCurTXOMap = i;
+    auto upTXHash = p;
+    const Chunk *upTX = 0;
+    if(gNeedTXHash && gNeedEdge && !skip) {
+        auto isGenTX = (0==memcmp(gNullHash.v, upTXHash, sizeof(gNullHash)));
+        if(likely(false==isGenTX)) {
+            auto i = gTXOMap.find(upTXHash);
+            if(unlikely(gTXOMap.end()==i)) {
+                errFatal("failed to locate upstream transaction");
             }
+            upTX = i->second;
+            giCurTXOMap = i;
         }
-
-        SKIP(uint256_t, dummyUpTXhash, p);
-        LOAD(uint32_t, upOutputIndex, p);
-        LOAD_VARINT(inputScriptSize, p);
-
-        auto inputScript = p;
-        if(!skip && 0!=upTX) {
-            auto upTXOutputs = upTX->getData();
-                parseOutputs<false, true>(
-                    upTXOutputs,
-                    upTXHash,
-                    upOutputIndex,
-                    txHash,
-                    inputIndex,
-                    inputScript,
-                    inputScriptSize
-                );
-            upTX->releaseData();
-        }
-
-        p += inputScriptSize;
-        SKIP(uint32_t, sequence, p);
-
+    }
+    SKIP(uint256_t, dummyUpTXhash, p);
+    LOAD(uint32_t, upOutputIndex, p);
+    LOAD_VARINT(inputScriptSize, p);
+    auto inputScript = p;
+    if(!skip && 0!=upTX) {
+        auto upTXOutputs = upTX->getData();
+        parseOutputs<false, true>(
+            upTXOutputs,
+            upTXHash,
+            upOutputIndex,
+            txHash,
+            inputIndex,
+            inputScript,
+            inputScriptSize
+            );
+    }
+    p += inputScriptSize;
+    SKIP(uint32_t, sequence, p);
     if(!skip) {
-      endInput(p,
-               upTXHash,
-               upOutputIndex,
-               txHash,
-               inputIndex,
-               inputScript,
-               inputScriptSize
-               );
+        endInput(p,
+                 upTXHash,
+                 upOutputIndex,
+                 txHash,
+                 inputIndex,
+                 inputScript,
+                 inputScriptSize
+            );
     }
 }
 
-template<
-    bool skip
->
-static void parseInputs(
+template<bool skip>
+static uint64_t parseInputs(
     const Block   *block,
     const uint8_t *&p,
     const uint8_t *txHash
-) {
+    ) {
     if(!skip) {
         startInputs(p);
     }
@@ -313,112 +304,197 @@ static void parseInputs(
     if(!skip) {
         endInputs(p);
     }
+    return nbInputs;
 }
 
-template<
-    bool skip
->
-static void parseTX(
+
+template<bool skip>
+static void parseWitness(
     const Block   *block,
     const uint8_t *&p
-) {
+    ) {
+    if(!skip) {
+        startWitness(p);
+    }
+    LOAD_VARINT(witScriptSize, p);
+    p += witScriptSize;
+}
+
+
+template<bool skip>
+static void parseWitnesses(
+    const Block   *block,
+    const uint8_t *&p
+    ) {
+    if(!skip) {
+        startWitnesses(p);
+    }
+    LOAD_VARINT(nbWitnesses, p);
+    for(uint64_t witIndex=0; witIndex<nbWitnesses; ++witIndex) {
+        parseWitness<skip>(block, p);
+    }
+    if(!skip) {
+        endWitnesses(p);
+    }
+}
+
+
+template<bool skip>
+static const uint8_t* parseTX(
+    const Block   *block,
+    const uint8_t *&p
+    ) {
     auto txStart = p;
     auto txEnd = p;
+    auto txWit = p;
     if(!skip)
-      // get txEnd, do nothing else
-      parseTX<true>(block, txEnd);
+        // get txEnd, do nothing else
+        txWit = parseTX<true>(block, txEnd);
 
     uint8_t *txHash = 0;
     if(gNeedTXHash && !skip) {
         txHash = allocHash256();
-        sha256Twice(txHash, txStart, txEnd - txStart);
+        if (txWit > txStart) {
+            sha256SegWitTwice(txHash, txStart, txWit - txStart - 6, txEnd - txWit - 4);
+        } else {
+            sha256Twice(txHash, txStart, txEnd - txStart);
+        }
     }
 
     if(!skip)
-      startTX(p, txHash, txEnd);
+        startTX(p, txHash, txEnd);
 
     SKIP(uint32_t, version, p);
-
-    parseInputs<skip>(block, p, txHash);
-
+    uint8_t dummy = *p;
+    uint8_t flags = *(p+1);
+    if (dummy == 0 && flags == 1) {
+        p += 2;
+    }
+    uint64_t nbInputs = parseInputs<skip>(block, p, txHash);
     Chunk *txo = 0;
     size_t txoOffset = -1;
     const uint8_t *outputsStart = p;
     if(gNeedTXHash && gNeedEdge && !skip) {
-      txo = Chunk::alloc();
-      txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
-      gTXOMap[txHash] = txo;
+        txo = Chunk::alloc();
+        txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
+        gTXOMap[txHash] = txo;
     }
 
     parseOutputs<skip, false>(p, txHash);
-
     if(txo) {
-      size_t txoSize = p - outputsStart;
-      txo->init(
-                block->chunk->getMap(),
-                txoSize,
-                txoOffset
-                );
+        size_t txoSize = p - outputsStart;
+        txo->init(
+            block->chunk->getMap(),
+            txoSize,
+            txoOffset
+            );
+        txo->getData();
     } else if (txHash) {
-      freeHash256((uint8_t*)txHash);
+        freeHash256((uint8_t*)txHash);
+    }
+
+    if (dummy == 0 && flags == 1) {
+        txWit = p;
+        for(uint64_t witIndex=0; witIndex<nbInputs; ++witIndex) {
+            parseWitnesses<skip>(block, p);
+        }
     }
 
     SKIP(uint32_t, lockTime, p);
 
     if(!skip)
-      endTX(p);
+        endTX(p);
 
-    // in tx:
-    // SKIP(uint32_t, version, p);
-    //
-    // SKIP(uint32_t, lockTime, p);
+    return txWit;
 }
+
+
+static void showParseProgress(
+    const Block *block
+    ) {
+    static double startTime = 0;
+    static double lastStatTime = 0;
+    static uint64_t offset = 0;
+    offset += block->chunk->getSize();
+    double now = usecs();
+    double elapsed = now - lastStatTime;
+    bool longEnough = (5*1000*1000<elapsed);
+    bool closeEnough = ((gChainSize - offset)<80);
+    if(unlikely(longEnough || closeEnough)) {
+        if(0==startTime) {
+            startTime = now;
+        }
+        double progress = offset/(double)gChainSize;
+        double elasedSinceStart = 1e-6*(now - startTime);
+        double speed = progress / elasedSinceStart;
+        fprintf(stderr, "%8ld blocks, %6.2f%%, elapsed = %5.2fs, eta = %5.2fs, nUtxo: %lu\r",
+             block->height, 100.0*progress,
+             elasedSinceStart, (1.0/speed)-elasedSinceStart,
+             gTXOMap.size());
+
+        lastStatTime = now;
+    }
+}
+
 
 static void parseBlock(
     const Block *block
-) {
+    ) {
     startBlock(block);
-        auto p = block->chunk->getData();
+    size_t size = block->chunk->getSize();
 
-            auto header = p;
-            SKIP(uint32_t, version, p);
-            SKIP(uint256_t, prevBlkHash, p);
-            SKIP(uint256_t, blkMerkleRoot, p);
-            SKIP(uint32_t, blkTime, p);
-            SKIP(uint32_t, blkBits, p);
-            SKIP(uint32_t, blkNonce, p);
+    auto p = block->chunk->getData();
+    // block->chunk->getData();
+    // uint8_t *block_hex = "";
+    // uint8_t block_data[2*1024*1024];
+    // fromHex(block_data, (uint8_t *)argv[1], size, false, false);
+    // const uint8_t *p = block_data;
 
-            startTXs(p);
-                LOAD_VARINT(nbTX, p);
-                for(uint64_t txIndex=0; likely(txIndex<nbTX); ++txIndex) {
-                    parseTX<false>(block, p);
-                }
-            endTXs(p);
+    // if (block->height >= 481825) {
+    //     printf("Block %ld Hex: ", block->height);
+    //     showHex(p, size, false);
+    //     printf(" (%lu)\n", size);
+    // }
+    // in every 5 seconds
+    showParseProgress(block);
 
-        block->chunk->releaseData();
+    auto header = p;
+    SKIP(uint32_t, version, p);
+    SKIP(uint256_t, prevBlkHash, p);
+    SKIP(uint256_t, blkMerkleRoot, p);
+    SKIP(uint32_t, blkTime, p);
+    SKIP(uint32_t, blkBits, p);
+    SKIP(uint32_t, blkNonce, p);
+
+    startTXs(p);
+    LOAD_VARINT(nbTX, p);
+    for(uint64_t txIndex=0; likely(txIndex<nbTX); ++txIndex) {
+        parseTX<false>(block, p);
+    }
+    endTXs(p);
+
+    block->chunk->releaseData();
     endBlock(block);
 }
 
 static void parseLongestChain() {
-
     info("pass 4 -- full blockchain analysis ...");
-
     gCallback->startLC();
-        auto blk = gNullBlock->next;
-        start(blk, gMaxBlock);
-        while(likely(0!=blk)) {
-            parseBlock(blk);
-            blk = blk->next;
-        }
+    auto blk = gNullBlock->next;
+    start(blk, gMaxBlock);
+    while(likely(0!=blk)) {
+        // if (blk->height == 481825) {
+        //     parseBlock(blk);
+        // }
+        parseBlock(blk);
+        blk = blk->next;
+    }
     gCallback->wrapup();
-
     info("pass 4 -- done.");
 }
 
 static void wireLongestChain() {
-
     info("pass 3 -- wire longest chain ...");
-
     auto block = gMaxBlock;
     while(1) {
         auto prev = block->prev;
@@ -428,17 +504,10 @@ static void wireLongestChain() {
         prev->next = block;
         block = prev;
     }
-
-    info(
-        "pass 3 -- done, maxHeight=%d",
-        (int)gMaxHeight
-    );
+    info("pass 3 -- done, maxHeight=%d", (int)gMaxHeight);
 }
 
-static void initCallback(
-    int   argc,
-    char *argv[]
-) {
+static void initCallback(int argc, char *argv[]) {
     const char *methodName = 0;
     if(0<argc) {
         methodName = argv[1];
@@ -452,8 +521,7 @@ static void initCallback(
     gCallback = Callback::find(methodName);
     fprintf(stderr, "\n");
 
-    info("starting command \"%s\"", gCallback->name());
-
+    info("starting command '%s'", gCallback->name());
     if(argv[1]) {
         auto i = 0;
         while('-'==argv[1][i]) {
@@ -469,137 +537,104 @@ static void initCallback(
     gNeedEdge = gCallback->needEdge();
 }
 
-static void findBlockParent(
-    Block *b
-)
-{
+static void findBlockParent(Block *b) {
     auto where = lseek64(
         b->chunk->getMap()->fd,
         b->chunk->getOffset(),
         SEEK_SET
-    );
+        );
     if(where!=(signed)b->chunk->getOffset()) {
         sysErrFatal(
             "failed to seek into block chain file %s",
             b->chunk->getMap()->name.c_str()
-        );
+            );
     }
-
     uint8_t buf[gHeaderSize];
     auto nbRead = read(
         b->chunk->getMap()->fd,
         buf,
         gHeaderSize
-    );
+        );
     if(nbRead<(signed)gHeaderSize) {
         sysErrFatal(
             "failed to read from block chain file %s",
             b->chunk->getMap()->name.c_str()
-        );
+            );
     }
-
     auto i = gBlockMap.find(4 + buf);
     if(unlikely(gBlockMap.end()==i)) {
-
         uint8_t bHash[2*kSHA256ByteSize + 1];
         toHex(bHash, b->hash);
 
         uint8_t pHash[2*kSHA256ByteSize + 1];
         toHex(pHash, 4 + buf);
 
-        warning(
-            "in block %s failed to locate parent block %s",
-            bHash,
-            pHash
-        );
+        warning("in block %s failed to locate parent block %s", bHash, pHash);
         return;
     }
     b->prev = i->second;
 }
 
-static void computeBlockHeight(
-    Block  *block,
-    size_t &lateLinks
-) {
-
+static void computeBlockHeight(Block  *block, size_t &lateLinks) {
     if(unlikely(gNullBlock==block)) {
         return;
     }
-
     auto b = block;
     while(b->height<0) {
-
         if(unlikely(0==b->prev)) {
-
             findBlockParent(b);
             ++lateLinks;
-
             if(0==b->prev) {
                 warning("failed to locate parent block");
                 return;
             }
         }
-
         b->prev->next = b;
         b = b->prev;
     }
-
     auto height = b->height;
     while(1) {
-
         b->height = height++;
-
         if(likely(gMaxHeight<b->height)) {
             gMaxHeight = b->height;
             gMaxBlock = b;
         }
-
         auto next = b->next;
         b->next = 0;
-
         if(block==b) {
             break;
         }
-
         b = next;
     }
 }
 
 static void computeBlockHeights() {
-
     size_t lateLinks = 0;
     info("pass 2 -- link all blocks ...");
     for(const auto &pair:gBlockMap) {
         computeBlockHeight(pair.second, lateLinks);
     }
-
-    info(
-        "pass 2 -- done, did %d late links",
-        (int)lateLinks
-    );
+    info("pass 2 -- done, did %d late links", (int)lateLinks);
 }
 
 static void getBlockHeader(
     size_t         &size,
     Block         *&prev,
-          uint8_t *&hash,
+    uint8_t *&hash,
     size_t         &earlyMissCnt,
     const uint8_t *p
-) {
+    ) {
 
     LOAD(uint32_t, magic, p);
     if(unlikely(gExpectedMagic!=magic)) {
         hash = 0;
         return;
     }
-
     LOAD(uint32_t, sz, p);
     size = sz;
     prev = 0;
-
     hash = allocHash256();
     sha256Twice(hash, p, gHeaderSize);
-
     auto i = gBlockMap.find(p + 4);
     if(likely(gBlockMap.end()!=i)) {
         prev = i->second;
@@ -609,9 +644,7 @@ static void getBlockHeader(
 }
 
 static void buildBlockHeaders() {
-
     info("pass 1 -- walk all blocks and build headers ...");
-
     size_t nbBlocks = 0;
     size_t baseOffset = 0;
     size_t earlyMissCnt = 0;
@@ -619,20 +652,14 @@ static void buildBlockHeaders() {
     const auto sz = sizeof(buf);
     const auto startTime = usecs();
     const auto oneMeg = 1024 * 1024;
-
     for(const auto &map : mapVec) {
-
         startMap(0);
-
         while(1) {
-
             auto nbRead = read(map.fd, buf, sz);
             if(nbRead<(signed)sz) {
                 break;
             }
-
             startBlock((uint8_t*)0);
-
             uint8_t *hash = 0;
             Block *prevBlock = 0;
             size_t blockSize = 0;
@@ -641,13 +668,11 @@ static void buildBlockHeaders() {
             if(unlikely(0==hash)) {
                 break;
             }
-
             auto where = lseek(map.fd, (blockSize + 8) - sz, SEEK_CUR);
             auto blockOffset = where - blockSize;
             if(where<0) {
                 break;
             }
-
             auto block = Block::alloc();
             block->init(hash, &map, blockSize, prevBlock, blockOffset);
             gBlockMap[hash] = block;
@@ -655,15 +680,12 @@ static void buildBlockHeaders() {
             ++nbBlocks;
         }
         baseOffset += map.size;
-
         auto now = usecs();
         auto elapsed = now - startTime;
         auto bytesPerSec = baseOffset / (elapsed*1e-6);
         auto bytesLeft = gChainSize - baseOffset;
         auto secsLeft = bytesLeft / bytesPerSec;
-        fprintf(
-            stderr,
-            "%.2f%% (%.2f/%.2f Gigs) -- %6d blocks -- %.2f Megs/sec -- ETA %.0f secs -- ELAPSED %.0f secs            \r",
+        fprintf(stderr, "%.2f%% (%.2f/%.2f Gigs) -- %6d blocks -- %.2f Megs/sec -- ETA %.0f secs -- ELAPSED %.0f secs\r",
             (100.0*baseOffset)/gChainSize,
             baseOffset/(1000.0*oneMeg),
             gChainSize/(1000.0*oneMeg),
@@ -671,32 +693,26 @@ static void buildBlockHeaders() {
             bytesPerSec*1e-6,
             secsLeft,
             elapsed*1e-6
-        );
+            );
         fflush(stderr);
-
         endMap(0);
     }
-
     if(0==nbBlocks) {
         warning("found no blocks - giving up");
         exit(1);
     }
-
     char msg[128];
     msg[0] = 0;
     if(0<earlyMissCnt) {
         sprintf(msg, ", %d early link misses", (int)earlyMissCnt);
     }
-
     auto elapsed = 1e-6*(usecs() - startTime);
-    info(
-        "pass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s                                            ",
-        elapsed,
+    info("pass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s", elapsed,
         (int)nbBlocks,
         (gChainSize * 1e-9),
         (gChainSize * 1e-6) / elapsed,
         msg
-    );
+        );
 }
 
 static void buildNullBlock() {
@@ -705,9 +721,7 @@ static void buildNullBlock() {
     gNullBlock->height = 0;
 }
 
-
 static void initHashtables() {
-
     info("initializing hash tables");
     gTXOMap.setEmptyKey(empty);
     gTXOMap.setDeleteKey(hash256_deleted);
@@ -731,37 +745,29 @@ static void initHashtables() {
 }
 
 static void makeBlockMaps() {
-
     const char *home = getenv("HOME");
     if(0==home) {
         warning("could not getenv(\"HOME\"), using \".\" instead.");
         home = ".";
     }
-
     std::string homeDir(home);
     std::string blockDir = homeDir + gCoinDirName + std::string("blocks");
-
     struct stat statBuf;
     auto r = stat(blockDir.c_str(), &statBuf);
     auto oldStyle = (r<0 || !S_ISDIR(statBuf.st_mode));
-
     int blkDatId = (oldStyle ? 1 : 0);
     auto fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
     while(1) {
-
-      // if(1<blkDatId) {
-      //   break;
-      // }
-
+        // if(10 < blkDatId) {
+        //   break;
+        // }
         char buf[64];
         sprintf(buf, fmt, blkDatId++);
-
         auto blockMapFileName =
             homeDir          +
             gCoinDirName     +
             std::string(buf)
-        ;
-
+            ;
         auto blockMapFD = open(blockMapFileName.c_str(), O_RDONLY);
         if(blockMapFD<0) {
             if(1<blkDatId) {
@@ -770,27 +776,24 @@ static void makeBlockMaps() {
             sysErrFatal(
                 "failed to open block chain file %s",
                 blockMapFileName.c_str()
-            );
+                );
         }
-
         struct stat statBuf;
         int st0 = fstat(blockMapFD, &statBuf);
         if(st0<0) {
             sysErrFatal(
                 "failed to fstat block chain file %s",
                 blockMapFileName.c_str()
-            );
+                );
         }
-
         auto mapSize = statBuf.st_size;
         auto st1 = posix_fadvise(blockMapFD, 0, mapSize, POSIX_FADV_NOREUSE);
         if(st1<0) {
             warning(
                 "failed to posix_fadvise on block chain file %s",
                 blockMapFileName.c_str()
-            );
+                );
         }
-
         Map map;
         map.size = mapSize;
         map.fd = blockMapFD;
@@ -806,18 +809,13 @@ static void cleanMaps() {
             sysErr(
                 "failed to close block chain file %s",
                 map.name.c_str()
-            );
+                );
         }
     }
 }
 
-int main(
-    int   argc,
-    char *argv[]
-) {
-
+int main(int argc, char *argv[]) {
     auto start = usecs();
-
     initCallback(argc, argv);
     makeBlockMaps();
     initHashtables();
@@ -827,7 +825,6 @@ int main(
     wireLongestChain();
     parseLongestChain();
     cleanMaps();
-
     auto elapsed = (usecs() - start)*1e-6;
     info("all done in %.2f seconds\n", elapsed);
     return 0;

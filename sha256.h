@@ -9,6 +9,11 @@
         const uint8_t *data,
         size_t        len
     );
+    void sha256_wit(
+        uint8_t       *result,
+        const uint8_t *data,
+        size_t        len_io,
+        size_t        len_wit
+    );
 
 #endif // __SHA256_H__
-

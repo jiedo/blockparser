@@ -417,6 +417,17 @@ int get_script_type(
         uint8_t       *type
     );
 
+
+    static inline void sha256SegWitTwice(
+              uint8_t *sha,
+        const uint8_t *buf,
+        uint64_t      size_io,
+        uint64_t      size_wit
+    ) {
+        sha256_wit(sha, buf, size_io, size_wit);
+        sha256(sha, sha, kSHA256ByteSize);
+    }
+
     static inline void sha256Twice(
               uint8_t *sha,
         const uint8_t *buf,

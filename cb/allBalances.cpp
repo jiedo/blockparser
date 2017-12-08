@@ -390,46 +390,7 @@ struct AllBalances:public Callback
     )
     {
         curBlock = b;
-
         const uint8_t *p = b->chunk->getData();
-        offset += b->chunk->getSize();
-
-        double now = usecs();
-        static double startTime = 0;
-        static double lastStatTime = 0;
-        double elapsed = now - lastStatTime;
-        bool longEnough = (5*1000*1000<elapsed);
-        bool closeEnough = ((chainSize - offset)<80);
-        if(unlikely(longEnough || closeEnough)) {
-
-            if(0==startTime) {
-                startTime = now;
-            }
-
-            double progress = offset/(double)chainSize;
-            double elasedSinceStart = 1e-6*(now - startTime);
-            double speed = progress / elasedSinceStart;
-            info(
-                "%8" PRIu64 " blocks, "
-                "%8.3f MegaAddrs , "
-                "%6.2f%% , "
-                "elapsed = %5.2fs , "
-                "eta = %5.2fs , "
-                "nAlloc256=%d, theory nAlloc256=%f, theory reuse nAlloc256=%f, reuse=%" PRIu64 " "
-                ,
-                curBlock->height,
-                addrMap.size()*1e-6,
-                100.0*progress,
-                elasedSinceStart,
-                (1.0/speed) - elasedSinceStart,
-                sizeHash256(),
-                (curBlock->height+nbTX)/16384.0,
-                (curBlock->height + nbTX - g_n_tx_reuse)/16384.0,
-                g_n_tx_reuse
-            );
-
-            lastStatTime = now;
-        }
 
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);

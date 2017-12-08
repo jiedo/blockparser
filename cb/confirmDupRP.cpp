@@ -54,10 +54,8 @@ struct ConfirmDupRP:public Callback
      ScriptMap gPublicKeyXMap;
 
      const uint8_t *txStart;
-     uint64_t currTXSize;
 
      uint64_t currTX;
-     uint64_t currBlock;
      uint64_t bTime;
      uint64_t nbBadR;
      uint64_t nbBadP_aleady_in_R;
@@ -75,7 +73,6 @@ struct ConfirmDupRP:public Callback
 
      virtual const char                   *name() const         { return "confirmrp"; }
      virtual const optparse::OptionParser *optionParser() const { return &parser;    }
-     virtual bool                         needTXHash() const    { return true;       }
      virtual void aliases(
           std::vector<const char*> &v
           ) const {
@@ -119,41 +116,7 @@ struct ConfirmDupRP:public Callback
           LOAD(uint32_t, blkTime, p);
 
           bTime = blkTime;
-          currBlock = b->height;
           currTX = 0;
-
-        static double startTime = 0;
-        static double lastStatTime = 0;
-        static uint64_t offset = 0;
-
-        offset += b->chunk->getSize();
-        double now = usecs();
-        double elapsed = now - lastStatTime;
-        bool longEnough = (5*1000*1000<elapsed);
-        bool closeEnough = ((chainSize - offset)<80);
-        if(unlikely(longEnough || closeEnough)) {
-            if(0==startTime) {
-                startTime = now;
-            }
-
-            double progress = offset/(double)chainSize;
-            double elasedSinceStart = 1e-6*(now - startTime);
-            double speed = progress / elasedSinceStart;
-            info(
-                "%8ld blocks, "
-                "%6.2f%% , "
-                "elapsed = %5.2fs , "
-                "eta = %5.2fs"
-                ,
-                currBlock,
-                100.0*progress,
-                elasedSinceStart,
-                (1.0/speed) - elasedSinceStart
-            );
-
-            lastStatTime = now;
-        }
-
      }
 
      virtual void startTX(
@@ -162,23 +125,19 @@ struct ConfirmDupRP:public Callback
           const uint8_t *txEnd
           ) {
           txStart = p;
-          currTXSize = txEnd - txStart;
           currTX++;
      }
 
 
-     virtual void edge(
-          uint64_t      value,
-          const uint8_t *upTXHash,
-          uint64_t      outputIndex,
-          const uint8_t *outputScript,
-          uint64_t      outputScriptSize,
-          const uint8_t *downTXHash,
-          uint64_t      inputIndex,
-          const uint8_t *inputScript,
-          uint64_t      inputScriptSize
-          ) {
-
+     virtual void endInput(
+                        const uint8_t *pend,
+                        const uint8_t *upTXHash,
+                        uint64_t      outputIndex,
+                        const uint8_t *downTXHash,
+                        uint64_t      inputIndex,
+                        const uint8_t *inputScript,
+                        uint64_t      inputScriptSize
+                        ) {
           const uint8_t *p = inputScript;
           const uint8_t *e = p + (size_t)inputScriptSize;
 

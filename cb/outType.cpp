@@ -20,17 +20,17 @@ struct OutType:public Callback
 
     uint64_t nbOutputs;
     uint64_t currBlock;
-    uint64_t nThreshold;
+    uint64_t nThreshold;        // print no detail if overflow
     uint64_t nbDumped;
     const uint8_t *txStart;
 
     OutType()
     {
         parser
-            .usage("[list of transaction hashes]")
+            .usage("")
             .version("")
             .description(
-                "dumpp all the details of  the list of specified transactions"
+                "dump the details of each outscript type"
             )
             .epilog("")
         ;
@@ -52,7 +52,7 @@ struct OutType:public Callback
         const char *argv[]
     ) {
         nbDumped = 0;
-        nThreshold = 1000;
+        nThreshold = 100;
 
         static uint8_t emptykey160[kRIPEMD160ByteSize] = { 0x52 };
         typeMap.setEmptyKey(emptykey160);
@@ -184,21 +184,6 @@ struct OutType:public Callback
             fromHex(type_new->v, hexhash, kRIPEMD160ByteSize, true);
             typeMap[type_new->v] = nThreshold;
           }
-
-        // test
-        for(int i=0; i!=sizeof(knownOutScriptTypes)/sizeof(char*); ++i)
-          {
-            const uint8_t *hexhash = (const uint8_t *)(knownOutScriptTypes[i]);
-            uint160_t type;
-            fromHex(type.v, hexhash, kRIPEMD160ByteSize, true);
-
-            auto j = typeMap.find(type.v);
-            if (typeMap.end() == j)
-              {
-                printf("!!! init hex, error: %d, %s\n", i, knownOutScriptTypes[i]);
-                exit(0);
-              }
-          }
         return 0;
     }
 
@@ -233,7 +218,7 @@ struct OutType:public Callback
         uint64_t        outputScriptSize
     ) {
         uint8_t type[128];
-        const char *typeName = "unknown";
+        const char *typeName = "other";
         uint8_t pubKeyHash[kSHA256ByteSize];
         int r = solveOutputScript(pubKeyHash, outputScript, outputScriptSize, type);
         const char *script_type_name[] = {
@@ -248,13 +233,12 @@ struct OutType:public Callback
         if (r >= -2 && r <=4) {
           typeName = script_type_name[r+2];
         }
-        printf("\n");
-        printf("        script type = %s\n", typeName);
+        printf("   script: %s\n", typeName);
 
         if( 0<=r ) {
             uint8_t btcAddr[64];
-            hash160ToAddr(btcAddr, pubKeyHash);
-            printf("        script pays to address %s\n", btcAddr);
+            hash160ToAddr(btcAddr, pubKeyHash, (uint8_t)type[0]);
+            printf("  address: %s\n", btcAddr);
         }
     }
 
@@ -276,7 +260,7 @@ struct OutType:public Callback
       int type_size = get_script_type(outputScript, outputScriptSize, type);
       auto j = typeMap.find(type);
 
-      if (typeMap.end() != j) { //found
+      if (likely(typeMap.end() != j)) { //found
         if (j->second++ > nThreshold)
           return;
         printf("\n%s    type: ", pr128(j->second).c_str());
@@ -286,8 +270,8 @@ struct OutType:public Callback
         typeMap[type_new->v] = 1;
         printf("\n1    type: ");
       }
-
       showHex(type, sizeof(uint160_t));
+
       struct tm gmTime;
       time_t blockTime = bTime;
       gmtime_r(&blockTime, &gmTime);
@@ -301,9 +285,10 @@ struct OutType:public Callback
       printf("\n   txHash: ");
       showHex(currHash);
       printf("\n");
-      printf("    block: %" PRIu64 "\n", currBlock-1);
-      printf("     time: %" PRIu64 " (%s GMT)\n", bTime, timeBuf);
-      printf(" spend[%" PRIu64 "]: %" PRIu64 "\n", nbOutputs-1, value);
+
+      printf("    block: %ld\n", currBlock-1);
+      printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
+      printf(" spend[%ld]: %ld\n", nbOutputs-1, value);
       showScript(outputScript, outputScriptSize, 0, "        ");
       showScriptInfo(outputScript, outputScriptSize);
 
@@ -315,8 +300,8 @@ struct OutType:public Callback
     {
         auto i = typeMap.begin();
         auto e = typeMap.end();
-        printf("Found %" PRIu64 " different script types.\n", typeMap.size());
-        printf("TYPE                                     N\n");
+        printf("\n\n");
+        printf("Type                                     Count\n");
         printf("---------------------------------------- ----------\n");
 
         while(i!=e) {
@@ -324,6 +309,8 @@ struct OutType:public Callback
           printf(" %s\n", pr128(i->second).c_str());
           ++i;
         }
+        printf("\n");
+        printf("Found %ld different types of outscript.\n", typeMap.size());
     }
 };
 

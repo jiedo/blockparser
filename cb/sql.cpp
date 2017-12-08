@@ -245,7 +245,8 @@ struct SQLDump:public Callback
         uint8_t addrType[3];
         uint160_t pubKeyHash;
         int type = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
-        if(likely(0<=type)) hash160ToAddr(address, pubKeyHash.v);
+        if(likely(0<=type))
+            hash160ToAddr(address, pubKeyHash.v, (uint8_t)addrType[0]);
 
         // id BIGINT PRIMARY KEY
         // dstAddress CHAR(36)

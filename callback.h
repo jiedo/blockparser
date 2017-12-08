@@ -79,6 +79,9 @@
                                      uint64_t      inputScriptSize
                                      ) {}
 
+        virtual void startWitnesses(const uint8_t *p){}   // the start of a TX's input array is encountered
+        virtual void endWitnesses(const uint8_t *p){}     // the end of a TX's input array is encountered
+        virtual void startWitness(const uint8_t *p){}    // a TX input is encountered
 
         virtual void startOutputs(const uint8_t *p){} // the start of a TX's output array is encountered
         virtual void endOutputs(const uint8_t *p){}   // the end of a TX's output array is encountered
