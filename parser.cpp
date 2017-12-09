@@ -24,6 +24,10 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
+static int blockMapCacheFD;
+static size_t blockMapCacheSize;
+static std::string blockMapCacheFileName;
+
 uint64_t g_n_tx_reuse;
 static TXIterator giCurTXOMap;
 
@@ -483,9 +487,6 @@ static void parseLongestChain() {
     auto blk = gNullBlock->next;
     start(blk, gMaxBlock);
     while(likely(0!=blk)) {
-        // if (blk->height == 481825) {
-        //     parseBlock(blk);
-        // }
         parseBlock(blk);
         blk = blk->next;
     }
@@ -550,11 +551,7 @@ static void findBlockParent(Block *b) {
             );
     }
     uint8_t buf[gHeaderSize];
-    auto nbRead = read(
-        b->chunk->getMap()->fd,
-        buf,
-        gHeaderSize
-        );
+    auto nbRead = read(b->chunk->getMap()->fd, buf, gHeaderSize);
     if(nbRead<(signed)gHeaderSize) {
         sysErrFatal(
             "failed to read from block chain file %s",
@@ -617,16 +614,9 @@ static void computeBlockHeights() {
     info("pass 2 -- done, did %d late links", (int)lateLinks);
 }
 
-static void getBlockHeader(
-    size_t         &size,
-    Block         *&prev,
-    uint8_t *&hash,
-    size_t         &earlyMissCnt,
-    const uint8_t *p
-    ) {
-
+static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, size_t &earlyMissCnt, const uint8_t *p) {
     LOAD(uint32_t, magic, p);
-    if(unlikely(gExpectedMagic!=magic)) {
+    if(unlikely(gExpectedMagic != magic)) {
         hash = 0;
         return;
     }
@@ -648,71 +638,87 @@ static void buildBlockHeaders() {
     size_t nbBlocks = 0;
     size_t baseOffset = 0;
     size_t earlyMissCnt = 0;
+    size_t blockSize = 0;
+    uint8_t *hash = 0;
     uint8_t buf[8+gHeaderSize];
+    Block *prevBlock = 0;
+    int nbCache = 0;
+    int nbData = 0;
+    int nbWrite = 0;
     const auto sz = sizeof(buf);
     const auto startTime = usecs();
-    const auto oneMeg = 1024 * 1024;
     for(const auto &map : mapVec) {
         startMap(0);
+        size_t blockOffset = 8;
         while(1) {
-            auto nbRead = read(map.fd, buf, sz);
-            if(nbRead<(signed)sz) {
+            if (map.size < blockOffset + gHeaderSize)
                 break;
+
+            size_t nbRead;
+            // if ((gChainSize - baseOffset) > 128*1024*1024 && blockMapCacheSize >= (nbBlocks+1)*sz) {
+            if (blockMapCacheSize >= (nbBlocks+1)*sz) {
+                nbRead = read(blockMapCacheFD, buf, sz);
+                if(nbRead<(signed)sz) {
+                    break;
+                }
+                nbCache++;
+            } else {
+                nbRead = read(map.fd, buf, sz);
+                if(nbRead<(signed)sz) {
+                    break;
+                }
+                nbData++;
+                nbRead = write(blockMapCacheFD, buf, sz);
+                if(nbRead<(signed)sz) {
+                    break;
+                }
+                nbWrite++;
             }
             startBlock((uint8_t*)0);
-            uint8_t *hash = 0;
-            Block *prevBlock = 0;
-            size_t blockSize = 0;
 
             getBlockHeader(blockSize, prevBlock, hash, earlyMissCnt, buf);
             if(unlikely(0==hash)) {
                 break;
             }
             auto where = lseek(map.fd, (blockSize + 8) - sz, SEEK_CUR);
-            auto blockOffset = where - blockSize;
             if(where<0) {
                 break;
             }
+
+            // real work
             auto block = Block::alloc();
             block->init(hash, &map, blockSize, prevBlock, blockOffset);
             gBlockMap[hash] = block;
+
+            blockOffset += (8 + blockSize);
             endBlock((uint8_t*)0);
             ++nbBlocks;
         }
-        baseOffset += map.size;
+        // progress info
         auto now = usecs();
         auto elapsed = now - startTime;
+        const auto oneMeg = 1024 * 1024;
+        baseOffset += map.size;
         auto bytesPerSec = baseOffset / (elapsed*1e-6);
         auto bytesLeft = gChainSize - baseOffset;
         auto secsLeft = bytesLeft / bytesPerSec;
-        fprintf(stderr, "%.2f%% (%.2f/%.2f Gigs) -- %6d blocks -- %.2f Megs/sec -- ETA %.0f secs -- ELAPSED %.0f secs\r",
-            (100.0*baseOffset)/gChainSize,
-            baseOffset/(1000.0*oneMeg),
-            gChainSize/(1000.0*oneMeg),
-            (int)nbBlocks,
-            bytesPerSec*1e-6,
-            secsLeft,
-            elapsed*1e-6
-            );
+        fprintf(stderr, "%.2f%% (%.2f/%.2f Gigs) - %6d blocks - %.2f Megs/sec - ETA %.0f secs - ELAPSED %.0f secs (%d, %d, %d)\r",
+                (100.0*baseOffset)/gChainSize, baseOffset/(1000.0*oneMeg), gChainSize/(1000.0*oneMeg),
+                (int)nbBlocks, bytesPerSec*1e-6, secsLeft, elapsed*1e-6, nbData, nbCache, nbWrite);
         fflush(stderr);
         endMap(0);
     }
-    if(0==nbBlocks) {
+    if(0 == nbBlocks) {
         warning("found no blocks - giving up");
         exit(1);
     }
-    char msg[128];
-    msg[0] = 0;
-    if(0<earlyMissCnt) {
+    char msg[128] = "";
+    if(0 < earlyMissCnt) {
         sprintf(msg, ", %d early link misses", (int)earlyMissCnt);
     }
     auto elapsed = 1e-6*(usecs() - startTime);
     info("pass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s", elapsed,
-        (int)nbBlocks,
-        (gChainSize * 1e-9),
-        (gChainSize * 1e-6) / elapsed,
-        msg
-        );
+        (int)nbBlocks, (gChainSize * 1e-9), (gChainSize * 1e-6) / elapsed, msg);
 }
 
 static void buildNullBlock() {
@@ -757,43 +763,37 @@ static void makeBlockMaps() {
     auto oldStyle = (r<0 || !S_ISDIR(statBuf.st_mode));
     int blkDatId = (oldStyle ? 1 : 0);
     auto fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
+    blockMapCacheFileName = homeDir + gCoinDirName + std::string("blocks_parser_cache.dat");
+    blockMapCacheFD = open(blockMapCacheFileName.c_str(), O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
     while(1) {
         // if(10 < blkDatId) {
         //   break;
         // }
         char buf[64];
         sprintf(buf, fmt, blkDatId++);
-        auto blockMapFileName =
-            homeDir          +
-            gCoinDirName     +
-            std::string(buf)
-            ;
+        auto blockMapFileName = homeDir + gCoinDirName + std::string(buf);
         auto blockMapFD = open(blockMapFileName.c_str(), O_RDONLY);
         if(blockMapFD<0) {
             if(1<blkDatId) {
                 break;
             }
-            sysErrFatal(
-                "failed to open block chain file %s",
-                blockMapFileName.c_str()
-                );
+            sysErrFatal("failed to open block chain file %s", blockMapFileName.c_str());
         }
         struct stat statBuf;
         int st0 = fstat(blockMapFD, &statBuf);
         if(st0<0) {
-            sysErrFatal(
-                "failed to fstat block chain file %s",
-                blockMapFileName.c_str()
-                );
+            sysErrFatal("failed to fstat block chain file %s", blockMapFileName.c_str());
         }
         auto mapSize = statBuf.st_size;
         auto st1 = posix_fadvise(blockMapFD, 0, mapSize, POSIX_FADV_NOREUSE);
         if(st1<0) {
-            warning(
-                "failed to posix_fadvise on block chain file %s",
-                blockMapFileName.c_str()
-                );
+            warning("failed to posix_fadvise on block chain file %s", blockMapFileName.c_str());
         }
+        auto st2 = fstat(blockMapCacheFD, &statBuf);
+        if(st2<0) {
+            sysErrFatal("failed to fstat block chain file %s", blockMapCacheFileName.c_str());
+        }
+        blockMapCacheSize = statBuf.st_size;
         Map map;
         map.size = mapSize;
         map.fd = blockMapFD;
@@ -803,13 +803,14 @@ static void makeBlockMaps() {
 }
 
 static void cleanMaps() {
+    auto r = close(blockMapCacheFD);
+    if(r<0) {
+        sysErr("failed to close block chain file %s", blockMapCacheFileName.c_str());
+    }
     for(const auto &map : mapVec) {
-        auto r = close(map.fd);
+        r = close(map.fd);
         if(r<0) {
-            sysErr(
-                "failed to close block chain file %s",
-                map.name.c_str()
-                );
+            sysErr("failed to close block chain file %s", map.name.c_str());
         }
     }
 }
@@ -817,13 +818,13 @@ static void cleanMaps() {
 int main(int argc, char *argv[]) {
     auto start = usecs();
     initCallback(argc, argv);
-    makeBlockMaps();
+    makeBlockMaps();            // open files
     initHashtables();
     buildNullBlock();
-    buildBlockHeaders();
-    computeBlockHeights();
-    wireLongestChain();
-    parseLongestChain();
+    buildBlockHeaders();        // 1. load blocks
+    computeBlockHeights();      // 2
+    wireLongestChain();         // 3
+    parseLongestChain();        // 4. parse blocks
     cleanMaps();
     auto elapsed = (usecs() - start)*1e-6;
     info("all done in %.2f seconds\n", elapsed);

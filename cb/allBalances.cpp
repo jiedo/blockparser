@@ -33,17 +33,6 @@ template<> uint8_t *PagedAllocator<Addr>::poolEnd = 0;
 static inline Addr *allocAddr() { return (Addr*)PagedAllocator<Addr>::alloc(); }
 static inline int freeAddr(Addr *ptr) { return  PagedAllocator<Addr>::free((uint8_t*)ptr);}
 
-struct CompareAddr
-{
-    bool operator()(
-        const Addr *const &a,
-        const Addr *const &b
-    ) const
-    {
-        return (b->sum) < (a->sum);
-    }
-};
-
 struct AllBalances:public Callback
 {
     bool detailed;
