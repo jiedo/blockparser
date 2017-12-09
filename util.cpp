@@ -54,6 +54,14 @@ double usecs() {
     return t.tv_usec + 1000000*((uint64_t)t.tv_sec);
 }
 
+void gmTime(char *timeBuf, const time_t &last) {
+    struct tm gmTime;
+    gmtime_r(&last, &gmTime);
+    asctime_r(&gmTime, timeBuf);
+    size_t sz =strlen(timeBuf);
+    if(0<sz) timeBuf[sz-1] = 0;
+}
+
 void toHex(
           uint8_t *dst,     // 2*size +1
     const uint8_t *src,     // size
