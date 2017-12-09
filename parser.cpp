@@ -394,7 +394,7 @@ static const uint8_t* parseTX(
             );
         txo->getData();
     } else if (txHash) {
-        freeHash256((uint8_t*)txHash);
+        freeHash256(txHash);
     }
 
     if (dummy == 0 && flags == 1) {
@@ -539,32 +539,13 @@ static void initCallback(int argc, char *argv[]) {
 }
 
 static void findBlockParent(Block *b) {
-    auto where = lseek64(
-        b->chunk->getMap()->fd,
-        b->chunk->getOffset(),
-        SEEK_SET
-        );
-    if(where!=(signed)b->chunk->getOffset()) {
-        sysErrFatal(
-            "failed to seek into block chain file %s",
-            b->chunk->getMap()->name.c_str()
-            );
-    }
-    uint8_t buf[gHeaderSize];
-    auto nbRead = read(b->chunk->getMap()->fd, buf, gHeaderSize);
-    if(nbRead<(signed)gHeaderSize) {
-        sysErrFatal(
-            "failed to read from block chain file %s",
-            b->chunk->getMap()->name.c_str()
-            );
-    }
-    auto i = gBlockMap.find(4 + buf);
+    auto i = gBlockMap.find(b->prev_hash);
     if(unlikely(gBlockMap.end()==i)) {
         uint8_t bHash[2*kSHA256ByteSize + 1];
         toHex(bHash, b->hash);
 
         uint8_t pHash[2*kSHA256ByteSize + 1];
-        toHex(pHash, 4 + buf);
+        toHex(pHash, b->prev_hash);
 
         warning("in block %s failed to locate parent block %s", bHash, pHash);
         return;
@@ -592,7 +573,7 @@ static void computeBlockHeight(Block  *block, size_t &lateLinks) {
     auto height = b->height;
     while(1) {
         b->height = height++;
-        if(likely(gMaxHeight<b->height)) {
+        if(likely(gMaxHeight < b->height)) {
             gMaxHeight = b->height;
             gMaxBlock = b;
         }
@@ -614,10 +595,11 @@ static void computeBlockHeights() {
     info("pass 2 -- done, did %d late links", (int)lateLinks);
 }
 
-static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, size_t &earlyMissCnt, const uint8_t *p) {
+static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, uint8_t *&prev_hash, size_t &earlyMissCnt, const uint8_t *p) {
     LOAD(uint32_t, magic, p);
     if(unlikely(gExpectedMagic != magic)) {
         hash = 0;
+        prev_hash = 0;
         return;
     }
     LOAD(uint32_t, sz, p);
@@ -625,7 +607,11 @@ static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, size_t &e
     prev = 0;
     hash = allocHash256();
     sha256Twice(hash, p, gHeaderSize);
-    auto i = gBlockMap.find(p + 4);
+
+    prev_hash = allocHash256();
+    memcpy(prev_hash, p + 4, kSHA256ByteSize);
+
+    auto i = gBlockMap.find(prev_hash);
     if(likely(gBlockMap.end()!=i)) {
         prev = i->second;
     } else {
@@ -640,6 +626,7 @@ static void buildBlockHeaders() {
     size_t earlyMissCnt = 0;
     size_t blockSize = 0;
     uint8_t *hash = 0;
+    uint8_t *prev_hash = 0;
     uint8_t buf[8+gHeaderSize];
     Block *prevBlock = 0;
     int nbCache = 0;
@@ -676,7 +663,7 @@ static void buildBlockHeaders() {
             }
             startBlock((uint8_t*)0);
 
-            getBlockHeader(blockSize, prevBlock, hash, earlyMissCnt, buf);
+            getBlockHeader(blockSize, prevBlock, hash, prev_hash, earlyMissCnt, buf);
             if(unlikely(0==hash)) {
                 break;
             }
@@ -687,7 +674,7 @@ static void buildBlockHeaders() {
 
             // real work
             auto block = Block::alloc();
-            block->init(hash, &map, blockSize, prevBlock, blockOffset);
+            block->init(hash, prev_hash, &map, blockSize, prevBlock, blockOffset);
             gBlockMap[hash] = block;
 
             blockOffset += (8 + blockSize);
@@ -723,7 +710,7 @@ static void buildBlockHeaders() {
 
 static void buildNullBlock() {
     gBlockMap[gNullHash.v] = gNullBlock = Block::alloc();
-    gNullBlock->init(gNullHash.v, 0, 0, 0, 0);
+    gNullBlock->init(gNullHash.v, gNullHash.v, 0, 0, 0, 0);
     gNullBlock->height = 0;
 }
 

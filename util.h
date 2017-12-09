@@ -217,12 +217,14 @@
 
         Chunk         *chunk;
         const uint8_t *hash;
+        const uint8_t *prev_hash;
         int64_t       height;
         Block         *prev;
         Block         *next;
 
         void init(
             const uint8_t *_hash,
+            const uint8_t *_prev_hash,
             const Map     *_map,
             size_t         _size,
             Block         *_prev,
@@ -232,6 +234,7 @@
             chunk->init(_map, _size, _offset);
 
             hash = _hash;
+            prev_hash = _prev_hash;
             height = -1;
             prev = _prev;
             next = 0;
