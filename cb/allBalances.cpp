@@ -12,7 +12,9 @@
 #include <string.h>
 
 struct Addr;
-static uint8_t emptyKey[kSHA256ByteSize] = { 0x52 };
+static uint8_t hash160_emptykey[kRIPEMD160ByteSize] = { 0x52 };
+static uint8_t hash160_deletedkey[kRIPEMD160ByteSize] = { 0x00 };
+
 typedef GoogMap<Hash160, Addr*, Hash160Hasher, Hash160Equal>::Map AddrMap;
 typedef GoogMap<Hash160, int, Hash160Hasher, Hash160Equal>::Map RestrictMap;
 
@@ -76,7 +78,9 @@ struct AllBalances:public Callback
         offset = 0;
         curBlock = 0;
 
-        addrMap.setEmptyKey(emptyKey);
+        addrMap.setEmptyKey(hash160_emptykey);
+        addrMap.setDeleteKey(hash160_deletedkey);
+
         addrMap.resize(15 * 1000 * 1000);
 
         optparse::Values &values = parser.parse_args(argc, argv);
@@ -94,7 +98,7 @@ struct AllBalances:public Callback
             info("restricting output to %" PRIu64 " addresses ...\n", (uint64_t)restricts.size());
             auto e = restricts.end();
             auto i = restricts.begin();
-            restrictMap.setEmptyKey(emptyKey);
+            restrictMap.setEmptyKey(hash160_emptykey);
             while(e!=i) {
                 const uint160_t &h = *(i++);
                 restrictMap[h.v] = 1;
@@ -134,6 +138,12 @@ struct AllBalances:public Callback
         } else {
             ++(addr->nbOut);
         }
+        if (unlikely(value == 0)) {
+            uint8_t buf[64];
+            hash160ToAddr(buf, addr->hash.v, addr->type);
+            info("have zero income: %s\n", buf);
+            return;
+        }
         addr->sum += value;
         if(addr->sum == 0) {
             addrMap.erase(i);
@@ -163,7 +173,7 @@ struct AllBalances:public Callback
                 break;
             Addr *addr = s->second;
             s++;
-            printf("%" PRIu64 "\t", addr->sum);
+            printf("%.8f\t", 1e-8*addr->sum);
             if(0 < addr->sum)
                 ++nonZeroCnt;
             uint8_t buf[64];
