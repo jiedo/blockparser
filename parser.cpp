@@ -649,6 +649,10 @@ static void buildBlockHeaders() {
                     break;
                 }
                 nbCache++;
+                auto where = lseek(map.fd, sz, SEEK_CUR);
+                if(where<0) {
+                    break;
+                }
             } else {
                 nbRead = read(map.fd, buf, sz);
                 if(nbRead<(signed)sz) {
@@ -704,7 +708,7 @@ static void buildBlockHeaders() {
         sprintf(msg, ", %d early link misses", (int)earlyMissCnt);
     }
     auto elapsed = 1e-6*(usecs() - startTime);
-    info("pass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s", elapsed,
+    info("\npass 1 -- took %.0f secs, %6d blocks, %.2f Gigs, %.2f Megs/secs %s", elapsed,
         (int)nbBlocks, (gChainSize * 1e-9), (gChainSize * 1e-6) / elapsed, msg);
 }
 
