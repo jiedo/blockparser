@@ -643,7 +643,7 @@ static void buildBlockHeaders() {
 
             size_t nbRead;
             // if ((gChainSize - baseOffset) > 128*1024*1024 && blockMapCacheSize >= (nbBlocks+1)*sz) {
-            if (blockMapCacheSize >= (nbBlocks+1)*sz) {
+            if (blockMapCacheSize >= (nbBlocks+1+1)*sz) {
                 nbRead = read(blockMapCacheFD, buf, sz);
                 if(nbRead<(signed)sz) {
                     break;
