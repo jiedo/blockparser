@@ -90,8 +90,8 @@ struct Closure:public Callback
     {
         uint8_t addrType[3];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
-        if(unlikely(type<0)) return;
+        int outputType = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
+        if(unlikely(outputType<0)) return;
 
         uint64_t a;
         auto i = addrMap.find(pubKeyHash.v);

@@ -105,14 +105,12 @@ struct Transactions:public Callback
     {
         uint8_t addrType[4];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
-        if(unlikely(type<0)) return;
+        int outputType = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
+        if(unlikely(outputType<0)) return;
 
         bool match = (addrMap.end() != addrMap.find(pubKeyHash.v));
         if(unlikely(match)) {
-
             int64_t newSum = sum + value*(add ? 1 : -1);
-
             if(csv) {
                 printf("%6" PRIu64 ", \"", bTime/86400 + 25569);
                 showHex(pubKeyHash.v, kRIPEMD160ByteSize, false);

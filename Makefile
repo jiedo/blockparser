@@ -36,7 +36,7 @@ COPT =  -O6                     \
 
 LOPT = -s -pg
 LOPT = -pg
-LOPT = -s -L.
+LOPT = -L.
 
 LIBS =                          \
     -lcrypto                    \

@@ -111,8 +111,8 @@ struct AllBalances:public Callback
         // last 2 params are not used
         uint8_t addrType[4];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
-        if(unlikely(type<0))
+        int outputType = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
+        if(unlikely(outputType<0))
             return;
         if(0!=restrictMap.size()) {
             auto r = restrictMap.find(pubKeyHash.v);
@@ -139,9 +139,9 @@ struct AllBalances:public Callback
             ++(addr->nbOut);
         }
         if (unlikely(value == 0)) {
-            uint8_t buf[64];
-            hash160ToAddr(buf, addr->hash.v, addr->type);
-            info("have zero income: %s\n", buf);
+            // uint8_t buf[64];
+            // hash160ToAddr(buf, addr->hash.v, addr->type);
+            // info("have zero income: %s\n", buf);
             return;
         }
         addr->sum += value;

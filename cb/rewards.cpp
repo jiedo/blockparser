@@ -108,19 +108,14 @@ struct Rewards:public Callback
     {
         if(!hasGenInput) return;
 
-        uint8_t addrType[3];
-        uint160_t pubKeyHash;
-        int type = solveOutputScript(
-            pubKeyHash.v,
-            outputScript,
-            outputScriptSize,
-            addrType
-        );
-        // if(unlikely(-2==type)) return;
         reward += value;
         if(!fullDump) return;
 
-        if(unlikely(type<0) && 0!=value) {
+        uint8_t addrType[3];
+        uint160_t pubKeyHash;
+        int outputType = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
+        // if(unlikely(-2==type)) return;
+        if(unlikely(outputType<0) && 0!=value) {
             printf("============================\n");
             printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock);
             fwrite(outputScript, outputScriptSize, 1, stdout);
@@ -130,42 +125,33 @@ struct Rewards:public Callback
             printf("\n");
             //errFatal("invalid script");
         }
-
         printf("%7d ", (int)currBlock);
         showHex(currTXHash);
-
         printf(" %16.8f ", 1e-8*value);
-
-        if(type<0) {
+        if(outputType<0) {
             printf("##########################################################################\n");
             return;
         } else {
-
             showFullAddr(pubKeyHash.v, true);
-            printf(" %2d ", type);
-
+            printf(" %2d ", outputType);
             // pay to hash160(pubKey)
-            if(0==type) {
+            if(0==outputType) {
                 // No pubkey
             }
-
             // pay to explicit pubKey
-            if(1==type) {
+            if(1==outputType) {
                 showHex(1+outputScript, 65, false);
             }
-
             // pay to explicit compressed pubKeys
-            if(2==type) {
+            if(2==outputType) {
                 uint8_t decompressed[65];
                 bool r = decompressPublicKey(decompressed, 1+outputScript);
                 showHex(decompressed, 65, false);
             }
-
             // pay to hash160(script)
-            if(3==type) {
+            if(3==outputType) {
                 // No pubkey, no script
             }
-
             printf("\n");
         }
     }
