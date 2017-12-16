@@ -188,10 +188,7 @@ struct OutType:public Callback
     }
 
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    ) {
+    virtual void startBlock(const Block *b, uint64_t chainSize) {
         currBlock = b->height;
         const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);

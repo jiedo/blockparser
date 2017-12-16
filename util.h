@@ -153,16 +153,21 @@ public:
         count = 0;
     }
 
-    const uint8_t *getData() const {
+    const uint8_t *getData(const uint8_t *init_data=0) const {
         if(likely(0==data)) {
-            auto where = lseek64(map->fd, offset, SEEK_SET);
-            if(where!=(signed)offset) {
-                sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
-            }
-            data = (uint8_t*)malloc(size);
-            auto sz = read(map->fd, data, size);
-            if(sz!=(signed)size) {
-                //fatal("can't map block");
+            if (0 != init_data) {
+                data = (uint8_t*)malloc(size);
+                memcpy(data, init_data, size);
+            } else {
+                auto where = lseek64(map->fd, offset, SEEK_SET);
+                if(where!=(signed)offset) {
+                    sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
+                }
+                data = (uint8_t*)malloc(size);
+                auto sz = read(map->fd, data, size);
+                if(sz!=(signed)size) {
+                    //fatal("can't map block");
+                }
             }
         }
         return data;

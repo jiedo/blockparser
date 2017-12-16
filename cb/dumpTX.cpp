@@ -85,11 +85,7 @@ struct DumpTX:public Callback
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
+    virtual void startBlock(const Block *b, uint64_t) {
         currBlock = b->height;
 
         const uint8_t *p = b->chunk->getData();

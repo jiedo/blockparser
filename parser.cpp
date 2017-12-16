@@ -250,7 +250,7 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
     if(txo) {
         size_t txoSize = p - outputsStart;
         txo->init(block->chunk->getMap(), txoSize, txoOffset);
-        txo->getData();
+        txo->getData(outputsStart);
     } else if (txHash) {
         freeHash256(txHash);
     }

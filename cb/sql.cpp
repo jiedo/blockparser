@@ -176,11 +176,7 @@ struct SQLDump:public Callback
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
+    virtual void startBlock(const Block *b, uint64_t) {
         if(0<=cutoffBlock && cutoffBlock<b->height) wrapup();
 
         auto p = b->chunk->getData();

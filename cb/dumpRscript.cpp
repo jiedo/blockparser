@@ -100,10 +100,7 @@ struct DumpRscript:public Callback
      }
 
 
-     virtual void startBlock(
-          const Block *b,
-          uint64_t chainSize
-          ) {
+    virtual void startBlock(const Block *b, uint64_t chainSize) {
           const uint8_t *p = b->chunk->getData();
           SKIP(uint32_t, version, p);
           SKIP(uint256_t, prevBlkHash, p);
