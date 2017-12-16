@@ -220,12 +220,7 @@ int IsCanonicalSignature(
     return 0;                //"ok";
 }
 
-int get_script_type(
-                    const uint8_t *p,
-                    size_t        scriptSize,
-                    uint8_t *type
-                    )
-{
+int get_script_type(const uint8_t *p, size_t scriptSize, uint8_t *type) {
   const uint8_t *start_p = p;
   const uint8_t *e = scriptSize + p;
   uint8_t last_c = 0;

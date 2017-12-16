@@ -224,12 +224,9 @@ struct OutType:public Callback
     {
       nbOutputs++;
       if (value==0) return;
-
       uint8_t type[20] = {0};
-
       int type_size = get_script_type(outputScript, outputScriptSize, type);
       auto j = typeMap.find(type);
-
       if (likely(typeMap.end() != j)) { //found
         if (j->second++ > nThreshold)
           return;

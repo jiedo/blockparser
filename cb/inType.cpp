@@ -54,19 +54,13 @@ struct InType:public Callback
     }
 
 
-    virtual int init(
-        int argc,
-        const char *argv[]
-    ) {
+    virtual int init(int argc, const char *argv[]) {
         optparse::Values &values = parser.parse_args(argc, argv);
         include_gen_input = values.get("gen");
-
         nbDumped = 0;
         nThreshold = 100;
-
         static uint8_t emptykey160[kRIPEMD160ByteSize] = { 0x52 };
         typeMap.setEmptyKey(emptykey160);
-
         // const char *knownInScriptTypes[] = {};
         // //do not dump detail of known script type, by setting threshold overflow.
         // for(int i=0; i!=sizeof(knownInScriptTypes)/sizeof(char*); ++i)
@@ -80,10 +74,7 @@ struct InType:public Callback
     }
 
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    ) {
+    virtual void startBlock(const Block *b, uint64_t) {
         currBlock = b->height;
         const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
@@ -94,11 +85,7 @@ struct InType:public Callback
     }
 
 
-    virtual void startTX(
-        const uint8_t *p,
-        const uint8_t *hash,
-        const uint8_t *txEnd
-    ) {
+    virtual void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd) {
         txStart = p;
         currHash = (uint8_t *)hash;
         nbInputs = 0;
@@ -106,10 +93,7 @@ struct InType:public Callback
     }
 
 
-    virtual void startInput(
-        const uint8_t *p
-    )
-    {
+    virtual void startInput(const uint8_t *p) {
         static uint256_t gNullHash;
         bool isGenInput = (0==memcmp(gNullHash.v, p, sizeof(gNullHash)));
         if(isGenInput) {
@@ -119,25 +103,13 @@ struct InType:public Callback
     }
 
 
-  virtual void endInput(
-                        const uint8_t *pend,
-                        const uint8_t *upTXHash,
-                        uint64_t      outputIndex,
-                        const uint8_t *downTXHash,
-                        uint64_t      inputIndex,
-                        const uint8_t *inputScript,
-                        uint64_t      inputScriptSize
-                        ) {
-
+    virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t      inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
       if(!include_gen_input && hasGenInput) {
         return;
       }
-
       uint8_t type[20] = {0};
-
       int type_size = get_script_type(inputScript, inputScriptSize, type);
       auto j = typeMap.find(type);
-
       if (likely(typeMap.end() != j)) { //found
         if (j->second++ > nThreshold)
           return;
@@ -153,22 +125,17 @@ struct InType:public Callback
       struct tm gmTime;
       time_t blockTime = bTime;
       gmtime_r(&blockTime, &gmTime);
-
       char timeBuf[256];
       asctime_r(&gmTime, timeBuf);
-
       size_t sz =strlen(timeBuf);
       if(0<sz) timeBuf[sz-1] = 0;
-
       printf("\n   txHash: ");
       showHex(currHash);
       printf("\n");
-
       printf("    block: %ld\n", currBlock-1);
       printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
       printf("    input: %ld\n", nbInputs-1);
       showScript(inputScript, inputScriptSize, 0, "        ");
-
       ++nbDumped;
     }
 

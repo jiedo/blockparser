@@ -48,205 +48,99 @@ static auto gCoinDirName = "/.bitcoin/";
 static const uint32_t gExpectedMagic = 0xd9b4bef9;
 #endif
 
+
 #define DO(x) x
-static inline void   startBlock(const uint8_t *p)                      { DO(gCallback->startBlock(p));    }
-static inline void     endBlock(const uint8_t *p)                      { DO(gCallback->endBlock(p));      }
-static inline void     startTXs(const uint8_t *p)                      { DO(gCallback->startTXs(p));      }
-static inline void       endTXs(const uint8_t *p)                      { DO(gCallback->endTXs(p));        }
-static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd){DO(gCallback->startTX(p,hash, txEnd));}
-static inline void        endTX(const uint8_t *p)                      { DO(gCallback->endTX(p));         }
-static inline void  startInputs(const uint8_t *p)                      { DO(gCallback->startInputs(p));   }
-static inline void    endInputs(const uint8_t *p)                      { DO(gCallback->endInputs(p));     }
-static inline void   startInput(const uint8_t *p)                      { DO(gCallback->startInput(p));    }
-//static inline void     endInput(const uint8_t *p)                      { DO(gCallback->endInput(p));      }
-
-static inline void  startWitnesses(const uint8_t *p)                      { DO(gCallback->startWitnesses(p));   }
-static inline void    endWitnesses(const uint8_t *p)                      { DO(gCallback->endWitnesses(p));     }
-static inline void   startWitness(const uint8_t *p)                      { DO(gCallback->startWitness(p));    }
-
-static inline void startOutputs(const uint8_t *p)                      { DO(gCallback->startOutputs(p));  }
-static inline void   endOutputs(const uint8_t *p)                      { DO(gCallback->endOutputs(p));    }
-static inline void  startOutput(const uint8_t *p)                      { DO(gCallback->startOutput(p));   }
-static inline void        start(const Block *s, const Block *e)        { DO(gCallback->start(s, e));      }
+static inline void startBlock(const uint8_t *p) { DO(gCallback->startBlock(p)); }
+static inline void endBlock(const uint8_t *p) { DO(gCallback->endBlock(p)); }
+static inline void startTXs(const uint8_t *p) { DO(gCallback->startTXs(p)); }
+static inline void endTXs(const uint8_t *p) { DO(gCallback->endTXs(p)); }
+static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd) { DO(gCallback->startTX(p,hash, txEnd)); }
+static inline void endTX(const uint8_t *p) { DO(gCallback->endTX(p)); }
+static inline void startInputs(const uint8_t *p) { DO(gCallback->startInputs(p)); }
+static inline void endInputs(const uint8_t *p) { DO(gCallback->endInputs(p)); }
+static inline void startInput(const uint8_t *p) { DO(gCallback->startInput(p)); }
+static inline void startWitnesses(const uint8_t *p) { DO(gCallback->startWitnesses(p)); }
+static inline void endWitnesses(const uint8_t *p) { DO(gCallback->endWitnesses(p)); }
+static inline void startWitness(const uint8_t *p) { DO(gCallback->startWitness(p)); }
+static inline void startOutputs(const uint8_t *p) { DO(gCallback->startOutputs(p)); }
+static inline void endOutputs(const uint8_t *p) { DO(gCallback->endOutputs(p)); }
+static inline void startOutput(const uint8_t *p) { DO(gCallback->startOutput(p)); }
+static inline void start(const Block *s, const Block *e) { DO(gCallback->start(s, e)); }
 #undef DO
 
-static inline void     startMap(const uint8_t *p) { gCallback->startMap(p);               }
-static inline void       endMap(const uint8_t *p) { gCallback->endMap(p);                 }
-static inline void  startBlock(const Block *b)    { gCallback->startBlock(b, gChainSize); }
-static inline void       endBlock(const Block *b) { gCallback->endBlock(b);               }
 
-static inline void endOutput(
-    const uint8_t *p,
-    uint64_t      value,
-    const uint8_t *txHash,
-    uint64_t      outputIndex,
-    const uint8_t *outputScript,
-    uint64_t      outputScriptSize
-    ) {
-    gCallback->endOutput(
-        p,
-        value,
-        txHash,
-        outputIndex,
-        outputScript,
-        outputScriptSize
-        );
+static inline void startMap(const uint8_t *p) { gCallback->startMap(p); }
+static inline void endMap(const uint8_t *p) { gCallback->endMap(p); }
+static inline void startBlock(const Block *b) { gCallback->startBlock(b, gChainSize); }
+static inline void endBlock(const Block *b) { gCallback->endBlock(b); }
+
+
+static inline void endOutput(const uint8_t *p, uint64_t value, const uint8_t *txHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize) {
+    gCallback->endOutput(p, value, txHash, outputIndex, outputScript, outputScriptSize);
 }
 
-static inline void endInput(
-    const uint8_t *pend,
-    const uint8_t *upTXHash,
-    uint64_t      outputIndex,
-    const uint8_t *downTXHash,
-    uint64_t      inputIndex,
-    const uint8_t *inputScript,
-    uint64_t      inputScriptSize
-    ) {
-    gCallback->endInput(
-        pend,
-        upTXHash,
-        outputIndex,
-        downTXHash,
-        inputIndex,
-        inputScript,
-        inputScriptSize
-        );
+
+static inline void endInput( const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
+    gCallback->endInput(pend, upTXHash, outputIndex, downTXHash, inputIndex, inputScript, inputScriptSize);
 }
 
-static inline void edge(
-    uint64_t      value,
-    const uint8_t *upTXHash,
-    uint64_t      outputIndex,
-    const uint8_t *outputScript,
-    uint64_t      outputScriptSize,
-    const uint8_t *downTXHash,
-    uint64_t      inputIndex,
-    const uint8_t *inputScript,
-    uint64_t      inputScriptSize
-    ) {
-    gCallback->edge(
-        value,
-        upTXHash,
-        outputIndex,
-        outputScript,
-        outputScriptSize,
-        downTXHash,
-        inputIndex,
-        inputScript,
-        inputScriptSize
-        );
+
+static inline void edge(uint64_t value, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
+    gCallback->edge(value, upTXHash, outputIndex, outputScript, outputScriptSize, downTXHash, inputIndex, inputScript, inputScriptSize);
 }
 
 
 template<bool skip, bool fullContext>
-static void parseOutput(
-    const uint8_t *&p,
-    const uint8_t *txHash,
-    uint64_t      outputIndex,
-    const uint8_t *downTXHash,
-    uint64_t      downInputIndex,
-    const uint8_t *downInputScript,
-    uint64_t      downInputScriptSize,
-    bool          found = false,
-    uint64_t      nbOutputs = 1
-    ) {
+static void parseOutput( const uint8_t *&p, const uint8_t *txHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t downInputIndex, const uint8_t *downInputScript, uint64_t downInputScriptSize, bool found=false, uint64_t nbOutputs=1) {
     if(!skip && !fullContext) {
         startOutput(p);
     }
-
     LOAD(uint64_t, value, p);
     LOAD_VARINT(outputScriptSize, p);
-
     auto outputScript = p;
     p += outputScriptSize;
-
     if(!skip && fullContext && gNeedEdge && found) {
-        edge(
-            value,
-            txHash,
-            outputIndex,
-            outputScript,
-            outputScriptSize,
-            downTXHash,
-            downInputIndex,
-            downInputScript,
-            downInputScriptSize
-            );
+        edge(value, txHash, outputIndex, outputScript, outputScriptSize, downTXHash, downInputIndex, downInputScript, downInputScriptSize);
 
         auto i = giCurTXOMap;
-        if (nbOutputs == (++(i->second->count)))
-            {
-                freeHash256((uint8_t*)i->first);
-                i->second->releaseData();
-                Chunk::release(i->second);
-                gTXOMap.erase(i);
-                g_n_tx_reuse++;
-            }
+        if (nbOutputs == (++(i->second->count))) {
+            freeHash256((uint8_t*)i->first);
+            i->second->releaseData();
+            Chunk::release(i->second);
+            gTXOMap.erase(i);
+            g_n_tx_reuse++;
+        }
     }
-
     if(!skip && !fullContext) {
-        endOutput(
-            p,
-            value,
-            txHash,
-            outputIndex,
-            outputScript,
-            outputScriptSize
-            );
+        endOutput(p, value, txHash, outputIndex, outputScript, outputScriptSize);
     }
 }
 
+
 template<bool skip, bool fullContext>
-static void parseOutputs(
-    const uint8_t *&p,
-    const uint8_t *txHash,
-    uint64_t      stopAtIndex = -1,
-    const uint8_t *downTXHash = 0,
-    uint64_t      downInputIndex = 0,
-    const uint8_t *downInputScript = 0,
-    uint64_t      downInputScriptSize = 0
-    ) {
+static void parseOutputs(const uint8_t *&p, const uint8_t *txHash, uint64_t stopAtIndex=-1, const uint8_t *downTXHash=0, uint64_t downInputIndex=0, const uint8_t *downInputScript=0, uint64_t downInputScriptSize=0) {
     if(!skip && !fullContext) {
         startOutputs(p);
     }
-
     LOAD_VARINT(nbOutputs, p);
     for(uint64_t outputIndex=0; outputIndex<nbOutputs; ++outputIndex) {
         auto found = (fullContext && !skip && (stopAtIndex==outputIndex));
-        parseOutput<skip, fullContext>(
-            p,
-            txHash,
-            outputIndex,
-            downTXHash,
-            downInputIndex,
-            downInputScript,
-            downInputScriptSize,
-            found,
-            nbOutputs
-            );
+        parseOutput<skip, fullContext>(p, txHash, outputIndex, downTXHash, downInputIndex, downInputScript, downInputScriptSize, found, nbOutputs);
         if(found) {
             break;
         }
     }
-
     if(!skip && !fullContext) {
         endOutputs(p);
     }
 }
 
-template<
-    bool skip
-    >
-static void parseInput(
-    const Block   *block,
-    const uint8_t *&p,
-    const uint8_t *txHash,
-    uint64_t      inputIndex
-    ) {
+
+template< bool skip >
+static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *txHash, uint64_t inputIndex) {
     if(!skip) {
         startInput(p);
     }
-
     auto upTXHash = p;
     const Chunk *upTX = 0;
     if(gNeedTXHash && gNeedEdge && !skip) {
@@ -266,45 +160,25 @@ static void parseInput(
     auto inputScript = p;
     if(!skip && 0!=upTX) {
         auto upTXOutputs = upTX->getData();
-        parseOutputs<false, true>(
-            upTXOutputs,
-            upTXHash,
-            upOutputIndex,
-            txHash,
-            inputIndex,
-            inputScript,
-            inputScriptSize
-            );
+        parseOutputs<false, true>(upTXOutputs, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize);
     }
     p += inputScriptSize;
     SKIP(uint32_t, sequence, p);
     if(!skip) {
-        endInput(p,
-                 upTXHash,
-                 upOutputIndex,
-                 txHash,
-                 inputIndex,
-                 inputScript,
-                 inputScriptSize
-            );
+        endInput(p, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize);
     }
 }
 
+
 template<bool skip>
-static uint64_t parseInputs(
-    const Block   *block,
-    const uint8_t *&p,
-    const uint8_t *txHash
-    ) {
+static uint64_t parseInputs(const Block *block, const uint8_t *&p, const uint8_t *txHash) {
     if(!skip) {
         startInputs(p);
     }
-
     LOAD_VARINT(nbInputs, p);
     for(uint64_t inputIndex=0; inputIndex<nbInputs; ++inputIndex) {
         parseInput<skip>(block, p, txHash, inputIndex);
     }
-
     if(!skip) {
         endInputs(p);
     }
@@ -313,10 +187,7 @@ static uint64_t parseInputs(
 
 
 template<bool skip>
-static void parseWitness(
-    const Block   *block,
-    const uint8_t *&p
-    ) {
+static void parseWitness(const Block *block, const uint8_t *&p) {
     if(!skip) {
         startWitness(p);
     }
@@ -326,10 +197,7 @@ static void parseWitness(
 
 
 template<bool skip>
-static void parseWitnesses(
-    const Block   *block,
-    const uint8_t *&p
-    ) {
+static void parseWitnesses(const Block *block, const uint8_t *&p) {
     if(!skip) {
         startWitnesses(p);
     }
@@ -344,16 +212,12 @@ static void parseWitnesses(
 
 
 template<bool skip>
-static const uint8_t* parseTX(
-    const Block   *block,
-    const uint8_t *&p
-    ) {
+static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
     auto txStart = p;
     auto txEnd = p;
     auto txWit = p;
     if(!skip)
-        // get txEnd, do nothing else
-        txWit = parseTX<true>(block, txEnd);
+        txWit = parseTX<true>(block, txEnd); // get txEnd, do nothing else
 
     uint8_t *txHash = 0;
     if(gNeedTXHash && !skip) {
@@ -364,7 +228,6 @@ static const uint8_t* parseTX(
             sha256Twice(txHash, txStart, txEnd - txStart);
         }
     }
-
     if(!skip)
         startTX(p, txHash, txEnd);
 
@@ -383,39 +246,29 @@ static const uint8_t* parseTX(
         txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
         gTXOMap[txHash] = txo;
     }
-
     parseOutputs<skip, false>(p, txHash);
     if(txo) {
         size_t txoSize = p - outputsStart;
-        txo->init(
-            block->chunk->getMap(),
-            txoSize,
-            txoOffset
-            );
+        txo->init(block->chunk->getMap(), txoSize, txoOffset);
         txo->getData();
     } else if (txHash) {
         freeHash256(txHash);
     }
-
     if (dummy == 0 && flags == 1) {
         txWit = p;
         for(uint64_t witIndex=0; witIndex<nbInputs; ++witIndex) {
             parseWitnesses<skip>(block, p);
         }
     }
-
     SKIP(uint32_t, lockTime, p);
 
     if(!skip)
         endTX(p);
-
     return txWit;
 }
 
 
-static void showParseProgress(
-    const Block *block
-    ) {
+static void showParseProgress(const Block *block) {
     static double startTime = 0;
     static double lastStatTime = 0;
     static uint64_t offset = 0;
@@ -441,28 +294,12 @@ static void showParseProgress(
 }
 
 
-static void parseBlock(
-    const Block *block
-    ) {
+static void parseBlock(const Block *block) {
     startBlock(block);
     size_t size = block->chunk->getSize();
-
     auto p = block->chunk->getData();
-    // block->chunk->getData();
-    // uint8_t *block_hex = "";
-    // uint8_t block_data[2*1024*1024];
-    // fromHex(block_data, (uint8_t *)argv[1], size, false, false);
-    // const uint8_t *p = block_data;
+    showParseProgress(block);   // in every 5 seconds
 
-    // if (block->height >= 481825) {
-    //     printf("Block %ld Hex: ", block->height);
-    //     showHex(p, size, false);
-    //     printf(" (%lu)\n", size);
-    // }
-    // in every 5 seconds
-    showParseProgress(block);
-
-    auto header = p;
     SKIP(uint32_t, version, p);
     SKIP(uint256_t, prevBlkHash, p);
     SKIP(uint256_t, blkMerkleRoot, p);
@@ -481,6 +318,7 @@ static void parseBlock(
     endBlock(block);
 }
 
+
 static void parseLongestChain() {
     info("pass 4 -- full blockchain analysis ...");
     gCallback->startLC();
@@ -493,6 +331,7 @@ static void parseLongestChain() {
     gCallback->wrapup();
     info("pass 4 -- done.");
 }
+
 
 static void wireLongestChain() {
     info("pass 3 -- wire longest chain ...");
@@ -507,6 +346,7 @@ static void wireLongestChain() {
     }
     info("pass 3 -- done, maxHeight=%d", (int)gMaxHeight);
 }
+
 
 static void initCallback(int argc, char *argv[]) {
     const char *methodName = 0;
@@ -529,7 +369,6 @@ static void initCallback(int argc, char *argv[]) {
             argv[1][i++] = 'x';
         }
     }
-
     auto ir = gCallback->init(argc, (const char **)argv);
     if(ir<0) {
         errFatal("callback init failed");
@@ -537,6 +376,7 @@ static void initCallback(int argc, char *argv[]) {
     gNeedTXHash = gCallback->needTXHash();
     gNeedEdge = gCallback->needEdge();
 }
+
 
 static void findBlockParent(Block *b) {
     auto i = gBlockMap.find(b->prev_hash);
@@ -552,6 +392,7 @@ static void findBlockParent(Block *b) {
     }
     b->prev = i->second;
 }
+
 
 static void computeBlockHeight(Block  *block, size_t &lateLinks) {
     if(unlikely(gNullBlock==block)) {
@@ -586,6 +427,7 @@ static void computeBlockHeight(Block  *block, size_t &lateLinks) {
     }
 }
 
+
 static void computeBlockHeights() {
     size_t lateLinks = 0;
     info("pass 2 -- link all blocks ...");
@@ -594,6 +436,7 @@ static void computeBlockHeights() {
     }
     info("pass 2 -- done, did %d late links", (int)lateLinks);
 }
+
 
 static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, uint8_t *&prev_hash, size_t &earlyMissCnt, const uint8_t *p) {
     LOAD(uint32_t, magic, p);
@@ -618,6 +461,7 @@ static void getBlockHeader(size_t &size, Block *&prev, uint8_t *&hash, uint8_t *
         ++earlyMissCnt;
     }
 }
+
 
 static void buildBlockHeaders() {
     info("pass 1 -- walk all blocks and build headers ...");
@@ -712,11 +556,13 @@ static void buildBlockHeaders() {
         (int)nbBlocks, (gChainSize * 1e-9), (gChainSize * 1e-6) / elapsed, msg);
 }
 
+
 static void buildNullBlock() {
     gBlockMap[gNullHash.v] = gNullBlock = Block::alloc();
     gNullBlock->init(gNullHash.v, gNullHash.v, 0, 0, 0, 0);
     gNullBlock->height = 0;
 }
+
 
 static void initHashtables() {
     info("initializing hash tables");
@@ -740,6 +586,7 @@ static void initHashtables() {
     info("estimated number of blocks = %.2fK", 1e-3*nbBlockEstimate);
     info("estimated number of transactions = %.2fM", 1e-6*nbTxEstimate);
 }
+
 
 static void makeBlockMaps() {
     const char *home = getenv("HOME");
@@ -793,6 +640,7 @@ static void makeBlockMaps() {
     }
 }
 
+
 static void cleanMaps() {
     auto r = close(blockMapCacheFD);
     if(r<0) {
@@ -805,6 +653,7 @@ static void cleanMaps() {
         }
     }
 }
+
 
 int main(int argc, char *argv[]) {
     auto start = usecs();
