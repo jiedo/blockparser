@@ -24,7 +24,7 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
-static uint8_t* map_data_cache;
+static uint8_t map_data_cache[256*1024*1024];
 static int blockMapCacheFD;
 static size_t blockMapCacheSize;
 static std::string blockMapCacheFileName;
@@ -315,7 +315,7 @@ static void parseBlock(const Block *block) {
     }
     endTXs(p);
 
-    block->chunk->releaseData();
+    // block->chunk->releaseData();
     endBlock(block);
 }
 
@@ -628,7 +628,6 @@ static void makeBlockMaps() {
     blockMapCacheFileName = homeDir + gCoinDirName + std::string("blocks_parser_cache.dat");
     blockMapCacheFD = open(blockMapCacheFileName.c_str(), O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
 
-    map_data_cache = (uint8_t*)malloc(256*1024*1024);
     while(1) {
         // if(10 < blkDatId) {
         //   break;
@@ -673,7 +672,6 @@ static void cleanMaps() {
     if(r<0) {
         sysErr("failed to close block chain file %s", blockMapCacheFileName.c_str());
     }
-    free(map_data_cache);
     for(const auto &map : mapVec) {
         r = close(map.fd);
         if(r<0) {

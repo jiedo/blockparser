@@ -161,8 +161,9 @@ public:
                 data = (uint8_t*)malloc(size);
                 memcpy(data, init_data, size);
             } else {
-                data = (uint8_t*)malloc(size);
-                memcpy(data, map->data+offset, size);
+                data = map->data+offset;
+                /* data = (uint8_t*)malloc(size); */
+                /* memcpy(data, map->data+offset, size); */
 
                 /* auto where = lseek64(map->fd, offset, SEEK_SET); */
                 /* if(where!=(signed)offset) { */
