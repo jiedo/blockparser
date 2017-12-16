@@ -332,8 +332,6 @@ static void parseLongestChain() {
         auto map = blk->chunk->getMap();
         if (int_last_map_fd != map->fd) {
             double start_map_time = usecs();
-
-            int_last_map_fd = map->fd;
             auto where = lseek64(map->fd, 0, SEEK_SET);
             if(where!=0) {
                 sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
@@ -351,9 +349,10 @@ static void parseLongestChain() {
                     }
                 }
             }
-            info("deal last map[%d], time: %f", map->fd, (start_map_time - last_map_time));
+            info(" -- deal last map[%d], time: %f", int_last_map_fd, (start_map_time - last_map_time));
             last_map_time = usecs();
             info("read next map[%d], time: %f", map->fd, (last_map_time - start_map_time));
+            int_last_map_fd = map->fd;
         }
         parseBlock(blk);
         blk = blk->next;
