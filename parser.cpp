@@ -290,7 +290,7 @@ static void showParseProgress(const Block *block) {
         double progress = offset/(double)gChainSize;
         double elasedSinceStart = 1e-6*(now - startTime);
         double speed = progress / elasedSinceStart;
-        fprintf(stderr, "%8ld blocks, %6.2f%%, elapsed = %5.2fs, eta = %5.2fs, nUtxo: %lu\n",
+        fprintf(stderr, "%8ld blocks, %6.2f%%, elapsed = %5.2fs, eta = %5.2fs, nUtxo: %lu\r",
              block->height, 100.0*progress,
              elasedSinceStart, (1.0/speed)-elasedSinceStart,
              gTXOMap.size());
@@ -331,7 +331,7 @@ static void parseLongestChain() {
     auto blk = gNullBlock->next;
     start(blk, gMaxBlock);
 
-    double last_map_time = usecs();
+    // double last_map_time = usecs();
     while(likely(0!=blk)) {
         auto map = blk->chunk->getMap();
         if (!is_map_cached[map->id-1]) {
@@ -354,9 +354,9 @@ static void parseLongestChain() {
                     }
                 }
             }
-            info(" --     deal last, time: %f", (start_map_time - last_map_time));
-            last_map_time = usecs();
-            info("read next map[%d], time: %f", map->fd, (last_map_time - start_map_time));
+            // info(" --     deal last, time: %f", (start_map_time - last_map_time));
+            // last_map_time = usecs();
+            // info("read next map[%d]=%d, time: %f", map->id, map->fd, (last_map_time - start_map_time));
         }
         parseBlock(blk);
         blk = blk->next;
