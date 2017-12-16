@@ -132,7 +132,8 @@ static inline int freeHash64(uint8_t *ptr) { return    PagedAllocator<hash64_t>:
 
 struct Map {
     int fd;
-    uint64_t size;
+    int id;
+    size_t size;
     uint8_t *data;
     std::string name;
 };

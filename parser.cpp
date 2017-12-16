@@ -24,7 +24,12 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
-static uint8_t map_data_cache[256*1024*1024];
+
+static uint8_t* is_map_cached;
+
+static const size_t map_cache_size = 10;
+static uint8_t* map_data_cache[map_cache_size];
+
 static int blockMapCacheFD;
 static size_t blockMapCacheSize;
 static std::string blockMapCacheFileName;
@@ -325,17 +330,18 @@ static void parseLongestChain() {
     gCallback->startLC();
     auto blk = gNullBlock->next;
     start(blk, gMaxBlock);
-    int int_last_map_fd = 0;
 
+    // double last_map_time = usecs();
     while(likely(0!=blk)) {
         auto map = blk->chunk->getMap();
-        int bytes_read = 0;
-        if (int_last_map_fd != map->fd) {
-            int_last_map_fd = map->fd;
+        if (!is_map_cached[map->id-1]) {
+            is_map_cached[map->id-1] = 1;
+            double start_map_time = usecs();
             auto where = lseek64(map->fd, 0, SEEK_SET);
             if(where!=0) {
                 sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
             }
+            int bytes_read = 0;
             while (true) {
                 auto sz = read(map->fd, map->data+bytes_read, 64*1024*1024);
                 if ((sz <= 0) && (errno != EINTR)) {
@@ -348,6 +354,9 @@ static void parseLongestChain() {
                     }
                 }
             }
+            // info(" --     deal last, time: %f", (start_map_time - last_map_time));
+            // last_map_time = usecs();
+            // info("read next map[%d]=%d, time: %f", map->id, map->fd, (last_map_time - start_map_time));
         }
         parseBlock(blk);
         blk = blk->next;
@@ -368,7 +377,26 @@ static void wireLongestChain() {
         prev->next = block;
         block = prev;
     }
-    info("pass 3 -- done, maxHeight=%d", (int)gMaxHeight);
+
+    int max_map_id = 0;
+    int max_diff = 0;
+    auto blk = gNullBlock->next;
+    while(likely(0!=blk)) {
+        auto map = blk->chunk->getMap();
+        if (max_map_id < map->id) {
+            max_map_id = map->id;
+        } else {
+            if (max_map_id - map->id > max_diff) {
+                max_diff = max_map_id - map->id;
+            }
+        }
+        blk = blk->next;
+    }
+
+    if (map_cache_size < (unsigned)max_diff + 1)
+        errFatal("map_cache_size:%d not enough, need:%d", map_cache_size, max_diff+1);
+
+    info("pass 3 -- done, maxHeight=%d, maxRollback=%d", (int)gMaxHeight, max_diff);
 }
 
 
@@ -628,6 +656,9 @@ static void makeBlockMaps() {
     blockMapCacheFileName = homeDir + gCoinDirName + std::string("blocks_parser_cache.dat");
     blockMapCacheFD = open(blockMapCacheFileName.c_str(), O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
 
+    for (uint64_t m=0; m < map_cache_size; m++) {
+        map_data_cache[m] = (uint8_t*)malloc(136*1024*1024);
+    }
     while(1) {
         // if(10 < blkDatId) {
         //   break;
@@ -660,17 +691,24 @@ static void makeBlockMaps() {
         Map map;
         map.size = mapSize;
         map.fd = blockMapFD;
-        map.data = map_data_cache;
+        map.id = blkDatId;
+        map.data = map_data_cache[(blkDatId-1) % map_cache_size];
         map.name = blockMapFileName;
         mapVec.push_back(map);
     }
+    is_map_cached = (uint8_t*)malloc(blkDatId);
+    memset(is_map_cached, 0, blkDatId);
 }
 
 
 static void cleanMaps() {
+    free(is_map_cached);
     auto r = close(blockMapCacheFD);
     if(r<0) {
         sysErr("failed to close block chain file %s", blockMapCacheFileName.c_str());
+    }
+    for (uint64_t m=0; m < map_cache_size; m++) {
+        free(map_data_cache[m]);
     }
     for(const auto &map : mapVec) {
         r = close(map.fd);
