@@ -200,6 +200,7 @@ struct Transactions:public Callback
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
         bTime = blkTime;
     }
 

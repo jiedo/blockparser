@@ -133,8 +133,10 @@ static inline int freeHash64(uint8_t *ptr) { return    PagedAllocator<hash64_t>:
 struct Map {
     int fd;
     uint64_t size;
+    uint8_t *data;
     std::string name;
 };
+
 
 struct Chunk {
 private:
@@ -159,15 +161,17 @@ public:
                 data = (uint8_t*)malloc(size);
                 memcpy(data, init_data, size);
             } else {
-                auto where = lseek64(map->fd, offset, SEEK_SET);
-                if(where!=(signed)offset) {
-                    sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
-                }
                 data = (uint8_t*)malloc(size);
-                auto sz = read(map->fd, data, size);
-                if(sz!=(signed)size) {
-                    //fatal("can't map block");
-                }
+                memcpy(data, map->data+offset, size);
+
+                /* auto where = lseek64(map->fd, offset, SEEK_SET); */
+                /* if(where!=(signed)offset) { */
+                /*     sysErrFatal("failed to seek into block chain file %s", map->name.c_str()); */
+                /* } */
+                /* auto sz = read(map->fd, g_map_data, map->size); */
+                /* if(sz!=(signed)map->size) { */
+                /*     errFatal("can't map block(%d<%d), fd:%d", sz, map->size, map->fd); */
+                /* } */
             }
         }
         return data;

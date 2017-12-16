@@ -59,6 +59,7 @@ struct Rewards:public Callback
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
         currBlock = b->height - 1;
         reward = 0;
     }
@@ -113,7 +114,7 @@ struct Rewards:public Callback
         // if(unlikely(-2==type)) return;
         if(unlikely(outputType<0) && 0!=value) {
             printf("============================\n");
-            printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock);
+            printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock-1);
             fwrite(outputScript, outputScriptSize, 1, stdout);
             printf("value = %16.8f\n", value*1e-8);
             showScript(outputScript, outputScriptSize);
@@ -121,7 +122,7 @@ struct Rewards:public Callback
             printf("\n");
             //errFatal("invalid script");
         }
-        printf("%7d ", (int)currBlock);
+        printf("%7d ", (int)currBlock-1);
         showHex(currTXHash);
         printf(" %16.8f ", 1e-8*value);
         if(outputType<0) {
@@ -160,7 +161,7 @@ struct Rewards:public Callback
         int64_t feesEarned = reward - (int64_t)baseReward;   // This sometimes goes <0 for some early, buggy blocks
         printf(
             "block %7d: baseReward=%-3.8f fees=%-3.8f total=%-3.8f\n",
-            (int)currBlock,
+            (int)currBlock-1,
             1e-8*baseReward,
             1e-8*feesEarned,
             1e-8*reward

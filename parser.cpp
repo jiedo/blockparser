@@ -24,6 +24,7 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
+static uint8_t* map_data_cache;
 static int blockMapCacheFD;
 static size_t blockMapCacheSize;
 static std::string blockMapCacheFileName;
@@ -324,7 +325,30 @@ static void parseLongestChain() {
     gCallback->startLC();
     auto blk = gNullBlock->next;
     start(blk, gMaxBlock);
+    int int_last_map_fd = 0;
+
     while(likely(0!=blk)) {
+        auto map = blk->chunk->getMap();
+        int bytes_read = 0;
+        if (int_last_map_fd != map->fd) {
+            int_last_map_fd = map->fd;
+            auto where = lseek64(map->fd, 0, SEEK_SET);
+            if(where!=0) {
+                sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
+            }
+            while (true) {
+                auto sz = read(map->fd, map->data+bytes_read, 64*1024*1024);
+                if ((sz <= 0) && (errno != EINTR)) {
+                    perror("map failed.");
+                    errFatal("can't map block, size:%d, fd:%d", map->size, map->fd);
+                } else if (sz > 0) {
+                    bytes_read += sz;
+                    if(bytes_read >= (signed)map->size) {
+                        break;
+                    }
+                }
+            }
+        }
         parseBlock(blk);
         blk = blk->next;
     }
@@ -603,6 +627,8 @@ static void makeBlockMaps() {
     auto fmt = oldStyle ? "blk%04d.dat" : "blocks/blk%05d.dat";
     blockMapCacheFileName = homeDir + gCoinDirName + std::string("blocks_parser_cache.dat");
     blockMapCacheFD = open(blockMapCacheFileName.c_str(), O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+
+    map_data_cache = (uint8_t*)malloc(256*1024*1024);
     while(1) {
         // if(10 < blkDatId) {
         //   break;
@@ -635,6 +661,7 @@ static void makeBlockMaps() {
         Map map;
         map.size = mapSize;
         map.fd = blockMapFD;
+        map.data = map_data_cache;
         map.name = blockMapFileName;
         mapVec.push_back(map);
     }
@@ -646,6 +673,7 @@ static void cleanMaps() {
     if(r<0) {
         sysErr("failed to close block chain file %s", blockMapCacheFileName.c_str());
     }
+    free(map_data_cache);
     for(const auto &map : mapVec) {
         r = close(map.fd);
         if(r<0) {

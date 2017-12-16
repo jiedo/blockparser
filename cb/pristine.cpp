@@ -89,16 +89,11 @@ struct Pristine:public Callback
         ++nbInputs;
     }
 
-    virtual void  endInputs(
-        const uint8_t *p
-    )
-    {
+    virtual void  endInputs(const uint8_t *p) {
         if(hasGenInput) {
-
             if(1!=nbInputs) {
                 abort();
             }
-
             uint64_t age = currTime;
             uint64_t blk = currBlock;
             txMap[currTXHash] = (age<<32) + blk;

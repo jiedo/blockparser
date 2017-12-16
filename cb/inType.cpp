@@ -75,12 +75,13 @@ struct InType:public Callback
 
 
     virtual void startBlock(const Block *b, uint64_t) {
-        currBlock = b->height;
         const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
+        currBlock = b->height;
         bTime = blkTime;
     }
 

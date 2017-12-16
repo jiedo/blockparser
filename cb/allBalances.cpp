@@ -42,11 +42,11 @@ struct AllBalances:public Callback
     uint64_t offset;
     int64_t nbTX;
     int64_t cutoffBlock;
+    int64_t currBlock;
     optparse::OptionParser parser;
 
     AddrMap addrMap;
     uint32_t blockTime;
-    const Block *curBlock;
     RestrictMap restrictMap;
     std::vector<uint160_t> restricts;
 
@@ -76,7 +76,7 @@ struct AllBalances:public Callback
     virtual int init(int argc, const char *argv[]) {
         nbTX = 0;
         offset = 0;
-        curBlock = 0;
+        currBlock = 0;
 
         addrMap.setEmptyKey(hash160_emptykey);
         addrMap.setDeleteKey(hash160_deletedkey);
@@ -193,14 +193,15 @@ struct AllBalances:public Callback
     }
 
     virtual void startBlock(const Block *b, uint64_t chainSize ) {
-        curBlock = b;
         const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, bTime, p);
         blockTime = bTime;
-        if(0<=cutoffBlock && cutoffBlock<=curBlock->height) {
+
+        currBlock = b->height;
+        if(0<=cutoffBlock && cutoffBlock<=currBlock) {
             wrapup();
             exit(0);
         }
