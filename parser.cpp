@@ -4,6 +4,13 @@
 #include <errlog.h>
 #include <callback.h>
 
+#include <set>
+#include <condition_variable>
+#include <mutex>
+#include <future>
+#include <thread>
+#include <queue>
+
 #include <string>
 #include <vector>
 #include <fcntl.h>
@@ -18,14 +25,21 @@ typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map::iterator TXI
 typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map TXOMap;
 typedef GoogMap<Hash256, Block*, Hash256Hasher, Hash256Equal>::Map BlockMap;
 
+
+std::queue<int> queueBlock;
+std::queue<int> queueMap;
+std::mutex loadMutex;
+std::condition_variable loadCondVar;
+
+std::mutex parseMutex;
+std::condition_variable parseCondVar;
+
+
 static bool gNeedTXHash;
 static bool gNeedEdge;
 static Callback *gCallback;
 
 static std::vector<Map> mapVec;
-
-
-static uint8_t* is_map_cached;
 
 static const size_t map_cache_size = 10;
 static uint8_t* map_data_cache[map_cache_size];
@@ -330,13 +344,58 @@ static void parseLongestChain() {
     gCallback->startLC();
     auto blk = gNullBlock->next;
     start(blk, gMaxBlock);
+    // double last_map_time = usecs();
+    // double last_wait_time = usecs();
+    while(likely(0!=blk)) {
+        int code = 0;
+        {
+            std::unique_lock<std::mutex> ul(loadMutex);
+            loadCondVar.wait(ul, []{return !queueBlock.empty();});
+            code = queueBlock.front();
+            queueBlock.pop();
+        }
+        if (code) {
+            {
+                std::lock_guard<std::mutex> lg(parseMutex);
+                queueMap.push(0);
+            }
+            parseCondVar.notify_one();
+
+            // double now_time = usecs();
+            // info(" --     deal time: %f", (last_wait_time - last_map_time));
+            // info(" --     wait time: %f", (now_time - last_wait_time));
+            // last_map_time = now_time;
+        }
+        // parseCondVar.notify_one();
+        parseBlock(blk);
+        // if (!code) {
+        //     last_wait_time = usecs();
+        // }
+
+        blk = blk->next;
+    }
+    gCallback->wrapup();
+    info("pass 4 -- done.");
+}
+
+
+static void loadLongestChainMapData() {
+    info("pass 4 -- prepare data ...");
+    auto blk = gNullBlock->next;
+
+    queueMap.push(0);
+    parseCondVar.notify_one();
 
     // double last_map_time = usecs();
+    std::set<int> is_map_cached;
     while(likely(0!=blk)) {
         auto map = blk->chunk->getMap();
-        if (!is_map_cached[map->id-1]) {
-            is_map_cached[map->id-1] = 1;
-            double start_map_time = usecs();
+        auto pos = is_map_cached.find(map->id-1);
+        int code = 0;
+        if (pos == is_map_cached.end()) {
+            is_map_cached.insert(map->id-1);
+
+            // double start_map_time = usecs();
             auto where = lseek64(map->fd, 0, SEEK_SET);
             if(where!=0) {
                 sysErrFatal("failed to seek into block chain file %s", map->name.c_str());
@@ -354,16 +413,26 @@ static void parseLongestChain() {
                     }
                 }
             }
-            // info(" --     deal last, time: %f", (start_map_time - last_map_time));
             // last_map_time = usecs();
             // info("read next map[%d]=%d, time: %f", map->id, map->fd, (last_map_time - start_map_time));
+            {
+                std::unique_lock<std::mutex> ul(parseMutex);
+                parseCondVar.wait(ul, []{return !queueMap.empty();});
+                queueMap.pop();
+            }
+            code = 1;
         }
-        parseBlock(blk);
+        {
+            std::lock_guard<std::mutex> lg(loadMutex);
+            queueBlock.push(code);
+        }
+        loadCondVar.notify_one();
+        // info("pass 4 -- next");
         blk = blk->next;
     }
-    gCallback->wrapup();
     info("pass 4 -- done.");
 }
+
 
 
 static void wireLongestChain() {
@@ -696,13 +765,10 @@ static void makeBlockMaps() {
         map.name = blockMapFileName;
         mapVec.push_back(map);
     }
-    is_map_cached = (uint8_t*)malloc(blkDatId);
-    memset(is_map_cached, 0, blkDatId);
 }
 
 
 static void cleanMaps() {
-    free(is_map_cached);
     auto r = close(blockMapCacheFD);
     if(r<0) {
         sysErr("failed to close block chain file %s", blockMapCacheFileName.c_str());
@@ -728,6 +794,9 @@ int main(int argc, char *argv[]) {
     buildBlockHeaders();        // 1. load blocks
     computeBlockHeights();      // 2
     wireLongestChain();         // 3
+
+    auto c2 = std::async(std::launch::async, loadLongestChainMapData);
+
     parseLongestChain();        // 4. parse blocks
     cleanMaps();
     auto elapsed = (usecs() - start)*1e-6;

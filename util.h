@@ -163,17 +163,6 @@ public:
                 memcpy(data, init_data, size);
             } else {
                 data = map->data+offset;
-                /* data = (uint8_t*)malloc(size); */
-                /* memcpy(data, map->data+offset, size); */
-
-                /* auto where = lseek64(map->fd, offset, SEEK_SET); */
-                /* if(where!=(signed)offset) { */
-                /*     sysErrFatal("failed to seek into block chain file %s", map->name.c_str()); */
-                /* } */
-                /* auto sz = read(map->fd, g_map_data, map->size); */
-                /* if(sz!=(signed)map->size) { */
-                /*     errFatal("can't map block(%d<%d), fd:%d", sz, map->size, map->fd); */
-                /* } */
             }
         }
         return data;

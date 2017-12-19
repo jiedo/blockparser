@@ -41,7 +41,8 @@ LOPT = -L.
 LIBS =                          \
     -lcrypto                    \
     -ldl                        \
-    -lbloom                    \
+    -lbloom                     \
+    -lpthread                   \
 
 all:parser
 
