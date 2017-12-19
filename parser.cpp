@@ -25,15 +25,12 @@ typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map::iterator TXI
 typedef GoogMap<Hash256, Chunk*, Hash256Hasher, Hash256Equal>::Map TXOMap;
 typedef GoogMap<Hash256, Block*, Hash256Hasher, Hash256Equal>::Map BlockMap;
 
-
 std::queue<int> queueBlock;
 std::queue<int> queueMap;
 std::mutex loadMutex;
 std::condition_variable loadCondVar;
-
 std::mutex parseMutex;
 std::condition_variable parseCondVar;
-
 
 static bool gNeedTXHash;
 static bool gNeedEdge;
@@ -41,7 +38,7 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
-static const size_t map_cache_size = 10;
+static const size_t map_cache_size = 11;
 static uint8_t* map_data_cache[map_cache_size];
 
 static int blockMapCacheFD;
@@ -462,7 +459,7 @@ static void wireLongestChain() {
         blk = blk->next;
     }
 
-    if (map_cache_size < (unsigned)max_diff + 1)
+    if (map_cache_size < (unsigned)max_diff + 3)
         errFatal("map_cache_size:%d not enough, need:%d", map_cache_size, max_diff+1);
 
     info("pass 3 -- done, maxHeight=%d, maxRollback=%d", (int)gMaxHeight, max_diff);
@@ -796,7 +793,6 @@ int main(int argc, char *argv[]) {
     wireLongestChain();         // 3
 
     auto c2 = std::async(std::launch::async, loadLongestChainMapData);
-
     parseLongestChain();        // 4. parse blocks
     cleanMaps();
     auto elapsed = (usecs() - start)*1e-6;
