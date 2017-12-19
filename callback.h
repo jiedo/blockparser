@@ -57,8 +57,8 @@
 
         virtual void startInput(const uint8_t *p){}    // a TX input is encountered
         // exactly like startInput, but with a much richer context
-        virtual void edge(
-                          uint64_t value,            // Number of satoshis coming in on this input from upstream tx
+
+        virtual void edge(uint64_t value,            // Number of satoshis coming in on this input from upstream tx
                     const uint8_t *upTXHash,         // sha256 of upstream tx
                           uint64_t outputIndex,      // Index of output in upstream tx
                           // Raw script (challenge to spender) carried by output in upstream tx
@@ -69,8 +69,8 @@
                           // Raw script (answer to challenge) carried by input in downstream tx
                     const uint8_t *inputScript,
                           uint64_t inputScriptSize,   // Byte size of script carried by input in downstream tx
-                    const uint8_t *downWitness
-        ) {}
+                    const uint8_t *downWitness) {}
+
         virtual inline void endInput(const uint8_t *pend, // Pointer to TX output raw data
                                      const uint8_t *upTXHash,
                                      uint64_t      outputIndex,
@@ -84,14 +84,14 @@
         virtual void endOutputs(const uint8_t *p){}   // the end of a TX's output array is encountered
 
         virtual void startOutput(const uint8_t *p){}  // a TX output is encountered
-        virtual void endOutput(            // an output has been fully parsed
-            const uint8_t *p,              // Pointer to TX output raw data
-            uint64_t      value,           // Number of satoshis on this output
-            const uint8_t *txHash,         // sha256 of the current tx
-            uint64_t      outputIndex,     // Index of this output in the current tx
-            const uint8_t *outputScript,   // Raw script (challenge to would-be spender) carried by this output
-            uint64_t      outputScriptSize // Byte size of raw script
-        ) {}
+        virtual void endOutput(                       // an output has been fully parsed
+            const uint8_t *p,                         // Pointer to TX output raw data
+            uint64_t      value,                      // Number of satoshis on this output
+            const uint8_t *txHash,                    // sha256 of the current tx
+            uint64_t      outputIndex,                // Index of this output in the current tx
+            const uint8_t *outputScript,       // Raw script (challenge to would-be spender) carried by this output
+            uint64_t      outputScriptSize) {} // Byte size of raw script
+
     };
 
 #endif // __CALLBACK_H__

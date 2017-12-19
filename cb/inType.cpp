@@ -21,6 +21,7 @@ struct InType:public Callback
     bool hasGenInput;
     uint64_t currBlock;
     uint64_t nThreshold;        // print no detail if overflow
+    uint64_t nbWitness;
     uint64_t nbDumped;
     const uint8_t *txStart;
 
@@ -58,6 +59,7 @@ struct InType:public Callback
         optparse::Values &values = parser.parse_args(argc, argv);
         include_gen_input = values.get("gen");
         nbDumped = 0;
+        nbWitness = 0;
         nThreshold = 100;
         static uint8_t emptykey160[kRIPEMD160ByteSize] = { 0x52 };
         typeMap.setEmptyKey(emptykey160);
@@ -108,6 +110,10 @@ struct InType:public Callback
         if(!include_gen_input && hasGenInput) {
             return;
         }
+
+        if (downWitness != NULL)
+            nbWitness++;
+
         uint8_t type[20] = {0};
         int type_size = get_script_type(inputScript, inputScriptSize, type);
         auto j = typeMap.find(type);
@@ -137,6 +143,7 @@ struct InType:public Callback
         printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
         printf("    input: %ld\n", nbInputs-1);
         showScript(inputScript, inputScriptSize, 0, "        ");
+
         ++nbDumped;
     }
 
@@ -156,6 +163,7 @@ struct InType:public Callback
         }
         printf("\n");
         printf("Found %ld different types of inscript.\n", typeMap.size());
+        printf("Found %ld Witness input.\n", nbWitness);
     }
 };
 
