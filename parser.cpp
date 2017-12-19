@@ -38,7 +38,7 @@ static Callback *gCallback;
 
 static std::vector<Map> mapVec;
 
-static const size_t map_cache_size = 11;
+static const size_t map_cache_size = 12;
 static uint8_t* map_data_cache[map_cache_size];
 
 static int blockMapCacheFD;
