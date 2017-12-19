@@ -15,6 +15,7 @@ struct SimpleStats:public Callback
     uint128_t nbBlocks;
     uint128_t nbInputs;
     uint128_t nbOutputs;
+    uint128_t nbWitness;
     uint128_t nbValidBlocks;
     uint128_t nbTransactions;
 
@@ -46,6 +47,7 @@ struct SimpleStats:public Callback
         volume = 0;
         nbBlocks = 0;
         nbInputs = 0;
+        nbWitness = 0;
         nbOutputs = 0;
         nbValidBlocks = 0;
         nbTransactions = 0;
@@ -74,6 +76,8 @@ struct SimpleStats:public Callback
             printf("    nbOrphanedBlocks in maps = %s\n", P(nbBlocks - nbValidBlocks));
             printf("\n");
 
+
+            printf("    nbWitness = %s\n", P(nbWitness));
             printf("    nbInputs = %s\n", P(nbInputs));
             printf("    nbOutputs = %s\n", P(nbOutputs));
             printf("    nbTransactions = %s\n", P(nbTransactions));
@@ -96,6 +100,7 @@ struct SimpleStats:public Callback
     virtual void   startInput(const uint8_t *p         ) { ++nbInputs;      }
     virtual void  startOutput(const uint8_t *p         ) { ++nbOutputs;     }
     virtual void   startBlock(const Block *b, uint64_t ) { ++nbValidBlocks; }
+    virtual void startWitnesses(const uint8_t *p) { ++nbWitness; }
 };
 
 static SimpleStats simpleStats;
