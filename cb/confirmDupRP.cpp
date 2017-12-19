@@ -126,15 +126,8 @@ struct ConfirmDupRP:public Callback
      }
 
 
-     virtual void endInput(
-                        const uint8_t *pend,
-                        const uint8_t *upTXHash,
-                        uint64_t      outputIndex,
-                        const uint8_t *downTXHash,
-                        uint64_t      inputIndex,
-                        const uint8_t *inputScript,
-                        uint64_t      inputScriptSize
-                        ) {
+    virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness) {
+
           const uint8_t *p = inputScript;
           const uint8_t *e = p + (size_t)inputScriptSize;
 

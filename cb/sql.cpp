@@ -284,7 +284,8 @@ struct SQLDump:public Callback
         const uint8_t *downTXHash,
         uint64_t      inputIndex,
         const uint8_t *inputScript,
-        uint64_t      inputScriptSize
+        uint64_t      inputScriptSize,
+        const uint8_t *downWitness
     )
     {
         uint256_t h;

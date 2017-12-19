@@ -68,7 +68,8 @@
                           uint64_t inputIndex,       // Index of input in downstream tx
                           // Raw script (answer to challenge) carried by input in downstream tx
                     const uint8_t *inputScript,
-                          uint64_t inputScriptSize   // Byte size of script carried by input in downstream tx
+                          uint64_t inputScriptSize,   // Byte size of script carried by input in downstream tx
+                    const uint8_t *downWitness
         ) {}
         virtual inline void endInput(const uint8_t *pend, // Pointer to TX output raw data
                                      const uint8_t *upTXHash,
@@ -76,12 +77,8 @@
                                      const uint8_t *downTXHash,
                                      uint64_t      inputIndex,
                                      const uint8_t *inputScript,
-                                     uint64_t      inputScriptSize
-                                     ) {}
-
-        virtual void startWitnesses(const uint8_t *p){}   // the start of a TX's input array is encountered
-        virtual void endWitnesses(const uint8_t *p){}     // the end of a TX's input array is encountered
-        virtual void startWitness(const uint8_t *p){}    // a TX input is encountered
+                                     uint64_t      inputScriptSize,
+                                     const uint8_t *downWitness) {}
 
         virtual void startOutputs(const uint8_t *p){} // the start of a TX's output array is encountered
         virtual void endOutputs(const uint8_t *p){}   // the end of a TX's output array is encountered

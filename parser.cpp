@@ -76,9 +76,6 @@ static inline void endTX(const uint8_t *p) { DO(gCallback->endTX(p)); }
 static inline void startInputs(const uint8_t *p) { DO(gCallback->startInputs(p)); }
 static inline void endInputs(const uint8_t *p) { DO(gCallback->endInputs(p)); }
 static inline void startInput(const uint8_t *p) { DO(gCallback->startInput(p)); }
-static inline void startWitnesses(const uint8_t *p) { DO(gCallback->startWitnesses(p)); }
-static inline void endWitnesses(const uint8_t *p) { DO(gCallback->endWitnesses(p)); }
-static inline void startWitness(const uint8_t *p) { DO(gCallback->startWitness(p)); }
 static inline void startOutputs(const uint8_t *p) { DO(gCallback->startOutputs(p)); }
 static inline void endOutputs(const uint8_t *p) { DO(gCallback->endOutputs(p)); }
 static inline void startOutput(const uint8_t *p) { DO(gCallback->startOutput(p)); }
@@ -97,18 +94,18 @@ static inline void endOutput(const uint8_t *p, uint64_t value, const uint8_t *tx
 }
 
 
-static inline void endInput( const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
-    gCallback->endInput(pend, upTXHash, outputIndex, downTXHash, inputIndex, inputScript, inputScriptSize);
+static inline void endInput( const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness=0) {
+    gCallback->endInput(pend, upTXHash, outputIndex, downTXHash, inputIndex, inputScript, inputScriptSize, downWitness);
 }
 
 
-static inline void edge(uint64_t value, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
-    gCallback->edge(value, upTXHash, outputIndex, outputScript, outputScriptSize, downTXHash, inputIndex, inputScript, inputScriptSize);
+static inline void edge(uint64_t value, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness=0) {
+    gCallback->edge(value, upTXHash, outputIndex, outputScript, outputScriptSize, downTXHash, inputIndex, inputScript, inputScriptSize, downWitness);
 }
 
 
 template<bool skip, bool fullContext>
-static void parseOutput( const uint8_t *&p, const uint8_t *txHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t downInputIndex, const uint8_t *downInputScript, uint64_t downInputScriptSize, bool found=false, uint64_t nbOutputs=1) {
+static void parseOutput( const uint8_t *&p, const uint8_t *txHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t downInputIndex, const uint8_t *downInputScript, uint64_t downInputScriptSize, const uint8_t *downWitness=0, bool found=false, uint64_t nbOutputs=1) {
     if(!skip && !fullContext) {
         startOutput(p);
     }
@@ -117,7 +114,7 @@ static void parseOutput( const uint8_t *&p, const uint8_t *txHash, uint64_t outp
     auto outputScript = p;
     p += outputScriptSize;
     if(!skip && fullContext && gNeedEdge && found) {
-        edge(value, txHash, outputIndex, outputScript, outputScriptSize, downTXHash, downInputIndex, downInputScript, downInputScriptSize);
+        edge(value, txHash, outputIndex, outputScript, outputScriptSize, downTXHash, downInputIndex, downInputScript, downInputScriptSize, downWitness);
 
         auto i = giCurTXOMap;
         if (nbOutputs == (++(i->second->count))) {
@@ -135,14 +132,14 @@ static void parseOutput( const uint8_t *&p, const uint8_t *txHash, uint64_t outp
 
 
 template<bool skip, bool fullContext>
-static void parseOutputs(const uint8_t *&p, const uint8_t *txHash, uint64_t stopAtIndex=-1, const uint8_t *downTXHash=0, uint64_t downInputIndex=0, const uint8_t *downInputScript=0, uint64_t downInputScriptSize=0) {
+static void parseOutputs(const uint8_t *&p, const uint8_t *txHash, uint64_t stopAtIndex=-1, const uint8_t *downTXHash=0, uint64_t downInputIndex=0, const uint8_t *downInputScript=0, uint64_t downInputScriptSize=0, const uint8_t *downWitness=0) {
     if(!skip && !fullContext) {
         startOutputs(p);
     }
     LOAD_VARINT(nbOutputs, p);
     for(uint64_t outputIndex=0; outputIndex<nbOutputs; ++outputIndex) {
         auto found = (fullContext && !skip && (stopAtIndex==outputIndex));
-        parseOutput<skip, fullContext>(p, txHash, outputIndex, downTXHash, downInputIndex, downInputScript, downInputScriptSize, found, nbOutputs);
+        parseOutput<skip, fullContext>(p, txHash, outputIndex, downTXHash, downInputIndex, downInputScript, downInputScriptSize, downWitness, found, nbOutputs);
         if(found) {
             break;
         }
@@ -154,7 +151,7 @@ static void parseOutputs(const uint8_t *&p, const uint8_t *txHash, uint64_t stop
 
 
 template< bool skip >
-static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *txHash, uint64_t inputIndex) {
+static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *&wit_p, const uint8_t *txHash, uint64_t inputIndex) {
     if(!skip) {
         startInput(p);
     }
@@ -171,60 +168,45 @@ static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *tx
             giCurTXOMap = i;
         }
     }
+
     SKIP(uint256_t, dummyUpTXhash, p);
     LOAD(uint32_t, upOutputIndex, p);
     LOAD_VARINT(inputScriptSize, p);
     auto inputScript = p;
     if(!skip && 0!=upTX) {
         auto upTXOutputs = upTX->getData();
-        parseOutputs<false, true>(upTXOutputs, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize);
+        parseOutputs<false, true>(upTXOutputs, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize, wit_p);
     }
     p += inputScriptSize;
     SKIP(uint32_t, sequence, p);
+
     if(!skip) {
-        endInput(p, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize);
+        endInput(p, upTXHash, upOutputIndex, txHash, inputIndex, inputScript, inputScriptSize, wit_p);
+    }
+    // witness
+    if (!skip && wit_p != NULL) {
+        LOAD_VARINT(nbWitnesses, wit_p);
+        for(uint64_t witIndex=0; witIndex<nbWitnesses; ++witIndex) {
+            LOAD_VARINT(witScriptSize, wit_p);
+            wit_p += witScriptSize;
+        }
     }
 }
 
 
 template<bool skip>
-static uint64_t parseInputs(const Block *block, const uint8_t *&p, const uint8_t *txHash) {
+static uint64_t parseInputs(const Block *block, const uint8_t *&p, const uint8_t *&wit_p, const uint8_t *txHash) {
     if(!skip) {
         startInputs(p);
     }
     LOAD_VARINT(nbInputs, p);
     for(uint64_t inputIndex=0; inputIndex<nbInputs; ++inputIndex) {
-        parseInput<skip>(block, p, txHash, inputIndex);
+        parseInput<skip>(block, p, wit_p, txHash, inputIndex);
     }
     if(!skip) {
         endInputs(p);
     }
     return nbInputs;
-}
-
-
-template<bool skip>
-static void parseWitness(const Block *block, const uint8_t *&p) {
-    if(!skip) {
-        startWitness(p);
-    }
-    LOAD_VARINT(witScriptSize, p);
-    p += witScriptSize;
-}
-
-
-template<bool skip>
-static void parseWitnesses(const Block *block, const uint8_t *&p) {
-    if(!skip) {
-        startWitnesses(p);
-    }
-    LOAD_VARINT(nbWitnesses, p);
-    for(uint64_t witIndex=0; witIndex<nbWitnesses; ++witIndex) {
-        parseWitness<skip>(block, p);
-    }
-    if(!skip) {
-        endWitnesses(p);
-    }
 }
 
 
@@ -249,12 +231,16 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
         startTX(p, txHash, txEnd);
 
     SKIP(uint32_t, version, p);
+    // check witness
     uint8_t dummy = *p;
     uint8_t flags = *(p+1);
     if (dummy == 0 && flags == 1) {
         p += 2;
+    } else {
+        txWit = NULL;
     }
-    uint64_t nbInputs = parseInputs<skip>(block, p, txHash);
+    // input
+    uint64_t nbInputs = parseInputs<skip>(block, p, txWit, txHash);
     Chunk *txo = 0;
     size_t txoOffset = -1;
     const uint8_t *outputsStart = p;
@@ -263,6 +249,7 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
         txoOffset = block->chunk->getOffset() + (p - block->chunk->getData());
         gTXOMap[txHash] = txo;
     }
+    // output
     parseOutputs<skip, false>(p, txHash);
     if(txo) {
         size_t txoSize = p - outputsStart;
@@ -271,10 +258,15 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
     } else if (txHash) {
         freeHash256(txHash);
     }
+    // witness
     if (dummy == 0 && flags == 1) {
         txWit = p;
-        for(uint64_t witIndex=0; witIndex<nbInputs; ++witIndex) {
-            parseWitnesses<skip>(block, p);
+        for(uint64_t witInput=0; witInput<nbInputs; ++witInput) {
+            LOAD_VARINT(nbWitnesses, p);
+            for(uint64_t witIndex=0; witIndex<nbWitnesses; ++witIndex) {
+                LOAD_VARINT(witScriptSize, p);
+                p += witScriptSize;
+            }
         }
     }
     SKIP(uint32_t, lockTime, p);

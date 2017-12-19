@@ -155,7 +155,7 @@ struct AllBalances:public Callback
         move(outputScript, outputScriptSize, txHash, outputIndex, value);
     }
 
-    virtual void edge(uint64_t value, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
+    virtual void edge(uint64_t value, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *outputScript, uint64_t outputScriptSize, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness) {
         move(outputScript, outputScriptSize, upTXHash, outputIndex, -(int64_t)value);
     }
 

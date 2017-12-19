@@ -103,41 +103,41 @@ struct InType:public Callback
         nbInputs++;
     }
 
+    virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness) {
 
-    virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t      inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize) {
-      if(!include_gen_input && hasGenInput) {
-        return;
-      }
-      uint8_t type[20] = {0};
-      int type_size = get_script_type(inputScript, inputScriptSize, type);
-      auto j = typeMap.find(type);
-      if (likely(typeMap.end() != j)) { //found
-        if (j->second++ > nThreshold)
-          return;
-        printf("\n%s    type: ", pr128(j->second).c_str());
-      } else {
-        uint160_t *type_new = (uint160_t *)allocHash160();
-        memcpy(type_new->v, type, kRIPEMD160ByteSize);
-        typeMap[type_new->v] = 1;
-        printf("\n1    type: ");
-      }
-      showHex(type, sizeof(uint160_t));
+        if(!include_gen_input && hasGenInput) {
+            return;
+        }
+        uint8_t type[20] = {0};
+        int type_size = get_script_type(inputScript, inputScriptSize, type);
+        auto j = typeMap.find(type);
+        if (likely(typeMap.end() != j)) { //found
+            if (j->second++ > nThreshold)
+                return;
+            printf("\n%s    type: ", pr128(j->second).c_str());
+        } else {
+            uint160_t *type_new = (uint160_t *)allocHash160();
+            memcpy(type_new->v, type, kRIPEMD160ByteSize);
+            typeMap[type_new->v] = 1;
+            printf("\n1    type: ");
+        }
+        showHex(type, sizeof(uint160_t));
 
-      struct tm gmTime;
-      time_t blockTime = bTime;
-      gmtime_r(&blockTime, &gmTime);
-      char timeBuf[256];
-      asctime_r(&gmTime, timeBuf);
-      size_t sz =strlen(timeBuf);
-      if(0<sz) timeBuf[sz-1] = 0;
-      printf("\n   txHash: ");
-      showHex(currHash);
-      printf("\n");
-      printf("    block: %ld\n", currBlock-1);
-      printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
-      printf("    input: %ld\n", nbInputs-1);
-      showScript(inputScript, inputScriptSize, 0, "        ");
-      ++nbDumped;
+        struct tm gmTime;
+        time_t blockTime = bTime;
+        gmtime_r(&blockTime, &gmTime);
+        char timeBuf[256];
+        asctime_r(&gmTime, timeBuf);
+        size_t sz =strlen(timeBuf);
+        if(0<sz) timeBuf[sz-1] = 0;
+        printf("\n   txHash: ");
+        showHex(currHash);
+        printf("\n");
+        printf("    block: %ld\n", currBlock-1);
+        printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
+        printf("    input: %ld\n", nbInputs-1);
+        showScript(inputScript, inputScriptSize, 0, "        ");
+        ++nbDumped;
     }
 
 

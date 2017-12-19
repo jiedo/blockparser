@@ -234,7 +234,8 @@ struct DumpTX:public Callback
         const uint8_t *downTXHash,
         uint64_t      inputIndex,
         const uint8_t *inputScript,
-        uint64_t      inputScriptSize
+        uint64_t      inputScriptSize,
+        const uint8_t *downWitness
     )
     {
         if(dump) {
@@ -255,16 +256,7 @@ struct DumpTX:public Callback
         }
     }
 
-    virtual void endInput(
-                          const uint8_t *pend,
-                          const uint8_t *upTXHash,
-                          uint64_t      outputIndex,
-                          const uint8_t *downTXHash,
-                          uint64_t      inputIndex,
-                          const uint8_t *inputScript,
-                          uint64_t      inputScriptSize
-                          )
-    {
+    virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness) {
         if(dump) {
             printf("    }\n");
         }
