@@ -87,7 +87,7 @@ struct Hash256Equal {
     }
 };
 
-template< typename T, size_t kPageSize=16384 >
+template<typename T, size_t kPageSize=16384>
     struct PagedAllocator {
         static uint32_t total_malloc;
         static uint8_t *pool;
@@ -221,7 +221,7 @@ struct Block {
 
 // Faster, uses more RAM
 #include <google/dense_hash_map>
-template< typename Key, typename Value, typename Hasher, typename Equal >
+template<typename Key, typename Value, typename Hasher, typename Equal>
     struct GoogMap {
         typedef google::dense_hash_map< Key, Value, Hasher, Equal > MapBase;
         struct Map:public MapBase {
@@ -238,7 +238,7 @@ template< typename Key, typename Value, typename Hasher, typename Equal >
 
 // Slower, uses less RAM
 #include <google/sparse_hash_map>
-template< typename Key, typename Value, typename Hasher, typename Equal >
+template<typename Key, typename Value, typename Hasher, typename Equal>
     struct GoogMap {
         typedef google::sparse_hash_map< Key, Value, Hasher, Equal > MapBase;
         struct Map:public MapBase {

@@ -150,7 +150,7 @@ static void parseOutputs(const uint8_t *&p, const uint8_t *txHash, uint64_t stop
 }
 
 
-template< bool skip >
+template<bool skip>
 static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *&wit_p, const uint8_t *txHash, uint64_t inputIndex) {
     if(!skip) {
         startInput(p);
