@@ -106,14 +106,11 @@ struct InType:public Callback
     }
 
     virtual void endInput(const uint8_t *pend, const uint8_t *upTXHash, uint64_t outputIndex, const uint8_t *downTXHash, uint64_t inputIndex, const uint8_t *inputScript, uint64_t inputScriptSize, const uint8_t *downWitness) {
-
+        if (downWitness != NULL)
+            nbWitness++;
         if(!include_gen_input && hasGenInput) {
             return;
         }
-
-        if (downWitness != NULL)
-            nbWitness++;
-
         uint8_t type[20] = {0};
         int type_size = get_script_type(inputScript, inputScriptSize, type);
         auto j = typeMap.find(type);
@@ -143,7 +140,6 @@ struct InType:public Callback
         printf("     time: %ld (%s GMT)\n", bTime, timeBuf);
         printf("    input: %ld\n", nbInputs-1);
         showScript(inputScript, inputScriptSize, 0, "        ");
-
         ++nbDumped;
     }
 

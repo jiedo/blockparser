@@ -71,7 +71,7 @@ static inline void startBlock(const uint8_t *p) { DO(gCallback->startBlock(p)); 
 static inline void endBlock(const uint8_t *p) { DO(gCallback->endBlock(p)); }
 static inline void startTXs(const uint8_t *p) { DO(gCallback->startTXs(p)); }
 static inline void endTXs(const uint8_t *p) { DO(gCallback->endTXs(p)); }
-static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd) { DO(gCallback->startTX(p,hash, txEnd)); }
+static inline void startTX(const uint8_t *p, const uint8_t *hash, const uint8_t *txEnd) { DO(gCallback->startTX(p, hash, txEnd)); }
 static inline void endTX(const uint8_t *p) { DO(gCallback->endTX(p)); }
 static inline void startInputs(const uint8_t *p) { DO(gCallback->startInputs(p)); }
 static inline void endInputs(const uint8_t *p) { DO(gCallback->endInputs(p)); }
