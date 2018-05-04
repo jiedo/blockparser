@@ -376,6 +376,8 @@ void hash160ToAddr(
     const uint8_t *hash160,
 #if defined(LITECOIN)
     uint8_t type = 48
+#elif defined(DOGECOIN)
+    uint8_t type = 30
 #else
     uint8_t type = 0
 #endif

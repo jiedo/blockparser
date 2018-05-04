@@ -7,8 +7,9 @@ CPLUS = g++
 INC =                           \
         -I.                     \
         -DNDEBUG                \
-        -DBITCOIN               \
-#        -DLITECOIN              \
+        -DDOGECOIN              \
+        # -DLITECOIN              \
+        # -DBITCOIN               \
 
 COPT = -pg
        # -O6
@@ -45,13 +46,6 @@ LIBS =                          \
     -lpthread                   \
 
 all:parser
-
-.objs/callback.o : callback.cpp
-	@echo c++ -- callback.cpp
-	@mkdir -p .deps
-	@mkdir -p .objs
-	@${CPLUS} -MD ${INC} ${COPT}  -c callback.cpp -o .objs/callback.o
-	@mv .objs/callback.d .deps
 
 .objs/allBalances.o : cb/allBalances.cpp
 	@echo c++ -- cb/allBalances.cpp
@@ -102,6 +96,13 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpTX.cpp -o .objs/dumpTX.o
 	@mv .objs/dumpTX.d .deps
 
+.objs/dumpBlock.o : cb/dumpBlock.cpp
+	@echo c++ -- cb/dumpBlock.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpBlock.cpp -o .objs/dumpBlock.o
+	@mv .objs/dumpBlock.d .deps
+
 .objs/outType.o : cb/outType.cpp
 	@echo c++ -- cb/outType.cpp
 	@mkdir -p .deps
@@ -116,20 +117,12 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/inType.cpp -o .objs/inType.o
 	@mv .objs/inType.d .deps
 
-
 .objs/pristine.o : cb/pristine.cpp
 	@echo c++ -- cb/pristine.cpp
 	@mkdir -p .deps
 	@mkdir -p .objs
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/pristine.cpp -o .objs/pristine.o
 	@mv .objs/pristine.d .deps
-
-.objs/help.o : cb/help.cpp
-	@echo c++ -- cb/help.cpp
-	@mkdir -p .deps
-	@mkdir -p .objs
-	@${CPLUS} -MD ${INC} ${COPT}  -c cb/help.cpp -o .objs/help.o
-	@mv .objs/help.d .deps
 
 .objs/rewards.o : cb/rewards.cpp
 	@echo c++ -- cb/rewards.cpp
@@ -165,6 +158,21 @@ all:parser
 	@mkdir -p .objs
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/transactions.cpp -o .objs/transactions.o
 	@mv .objs/transactions.d .deps
+
+# platform
+.objs/callback.o : callback.cpp
+	@echo c++ -- callback.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c callback.cpp -o .objs/callback.o
+	@mv .objs/callback.d .deps
+
+.objs/help.o : cb/help.cpp
+	@echo c++ -- cb/help.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/help.cpp -o .objs/help.o
+	@mv .objs/help.d .deps
 
 .objs/opcodes.o : opcodes.cpp
 	@echo c++ -- opcodes.cpp
@@ -210,27 +218,28 @@ all:parser
 
 OBJS=                       \
     .objs/allBalances.o     \
-    .objs/confirmDupRP.o   \
-    .objs/statusR.o   \
-    .objs/dumpShortRP.o     \
-    .objs/dumpRscript.o     \
-    .objs/callback.o        \
     .objs/closure.o         \
+    .objs/confirmDupRP.o    \
+    .objs/dumpRscript.o     \
+    .objs/dumpShortRP.o     \
     .objs/dumpTX.o          \
+    .objs/dumpBlock.o          \
+    .objs/inType.o          \
     .objs/outType.o         \
-    .objs/inType.o         \
+    .objs/pristine.o        \
+    .objs/rewards.o         \
+    .objs/simpleStats.o     \
+    .objs/sql.o             \
+    .objs/statusR.o         \
+    .objs/taint.o           \
+    .objs/transactions.o    \
+    .objs/callback.o        \
     .objs/help.o            \
     .objs/opcodes.o         \
     .objs/option.o          \
     .objs/parser.o          \
-    .objs/pristine.o        \
-    .objs/rewards.o         \
     .objs/rmd160.o          \
     .objs/sha256.o          \
-    .objs/simpleStats.o     \
-    .objs/sql.o             \
-    .objs/taint.o           \
-    .objs/transactions.o    \
     .objs/util.o            \
 
 

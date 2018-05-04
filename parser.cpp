@@ -65,6 +65,18 @@ static auto gCoinDirName = "/.bitcoin/";
 static const uint32_t gExpectedMagic = 0xd9b4bef9;
 #endif
 
+#if defined LITECOIN
+    static const size_t gHeaderSize = 80;
+    static auto gCoinDirName = "/.litecoin/";
+    static const uint32_t gExpectedMagic = 0xdbb6c0fb;
+#endif
+
+#if defined DOGECOIN
+    const int32_t VERSION_AUXPOW = (1 << 8);
+    static const size_t gHeaderSize = 80;
+    static auto gCoinDirName = "/.dogecoin/";
+    static const uint32_t gExpectedMagic = 0xc0c0c0c0;
+#endif
 
 #define DO(x) x
 static inline void startBlock(const uint8_t *p) { DO(gCallback->startBlock(p)); }
@@ -162,10 +174,18 @@ static void parseInput( const Block *block, const uint8_t *&p, const uint8_t *&w
         if(likely(false==isGenTX)) {
             auto i = gTXOMap.find(upTXHash);
             if(unlikely(gTXOMap.end()==i)) {
-                errFatal("failed to locate upstream transaction");
+                printf("##########################################################################\n");
+                printf("up hash: ");
+                showHex(upTXHash);
+                printf("\nhash: ");
+                showHex(txHash);
+                printf("\n##########################################################################\n");
+                printf("%8ld block", block->height);
+                errFatal("\nfailed to locate upstream transaction\n");
+            } else {
+                upTX = i->second;
+                giCurTXOMap = i;
             }
-            upTX = i->second;
-            giCurTXOMap = i;
         }
     }
 
@@ -223,6 +243,7 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
         txHash = allocHash256();
         if (txWit > txStart) {
             sha256SegWitTwice(txHash, txStart, txWit - txStart - 6, txEnd - txWit - 4);
+            info("finished dump\n");
         } else {
             sha256Twice(txHash, txStart, txEnd - txStart);
         }
@@ -231,9 +252,11 @@ static const uint8_t* parseTX(const Block *block, const uint8_t *&p) {
         startTX(p, txHash, txEnd);
 
     SKIP(uint32_t, version, p);
+
     // check witness
     uint8_t dummy = *p;
     uint8_t flags = *(p+1);
+
     if (dummy == 0 && flags == 1) {
         p += 2;
     } else {
@@ -309,13 +332,26 @@ static void parseBlock(const Block *block) {
     auto p = block->chunk->getData();
     showParseProgress(block);   // in every 5 seconds
 
-    SKIP(uint32_t, version, p);
+    LOAD(uint32_t, nVersion, p);
     SKIP(uint256_t, prevBlkHash, p);
     SKIP(uint256_t, blkMerkleRoot, p);
     SKIP(uint32_t, blkTime, p);
     SKIP(uint32_t, blkBits, p);
     SKIP(uint32_t, blkNonce, p);
 
+#if defined DOGECOIN
+    if (nVersion & VERSION_AUXPOW) {
+        parseTX<true>(block, p);
+        p += 32;                // parent_block hash
+        LOAD_VARINT(nbCB, p);   // coinbase_branch
+        p += 32*nbCB + 4;
+
+        LOAD_VARINT(nbBC, p);   // blockchain_branch
+        p += 32*nbBC + 4;
+
+        p += 80;                // Parent block header
+    }
+#endif
     startTXs(p);
     LOAD_VARINT(nbTX, p);
     for(uint64_t txIndex=0; likely(txIndex<nbTX); ++txIndex) {

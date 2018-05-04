@@ -415,7 +415,17 @@ void showScriptInfo(
 }
 
 int solveOutputScript(uint8_t *pubKeyHash, const uint8_t *script, uint64_t scriptSize, uint8_t *addType) {
+#if defined(LITECOIN)
+    addType[0] = 48;
+#endif
+
+#if defined(DOGECOIN)
+    addType[0] = 30;
+#endif
+#if defined(BITCOIN)
     addType[0] = 0;
+#endif
+
     // The most common output script type, pays to hash160(pubKey)
     if(likely(25==scriptSize             &&
             0x76==script[0]              &&  // OP_DUP
@@ -636,6 +646,8 @@ bool addrToHash160(
         memcpy(1+data, hash160, kRIPEMD160ByteSize);
         #if defined(LITECOIN)
             data[0] = 48;
+        #elif defined(DOGECOIN)
+            data[0] = 30;
         #else
             data[0] = 0;
         #endif
