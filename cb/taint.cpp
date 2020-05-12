@@ -67,7 +67,6 @@ struct Taint:public Callback
     virtual const char                   *name() const         { return "taint"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser; }
     virtual bool                         needTXHash() const    { return true;    }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -123,7 +122,8 @@ struct Taint:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         txBad = 0;
@@ -139,7 +139,7 @@ struct Taint:public Callback
         bool isSrcTX = (srcTxMap.end() != i);
 
         Number taint = 0;
-             if(unlikely(isSrcTX))    taint = 1;
+        if(unlikely(isSrcTX))         taint = 1;
         else if(0<txTotal && 0<txBad) taintMap[txHash] = taint = txBad/txTotal;
 
         if(threshold<taint) {
@@ -169,4 +169,3 @@ struct Taint:public Callback
 };
 
 static Taint taint;
-

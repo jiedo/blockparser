@@ -22,6 +22,7 @@ struct DumpTX:public Callback
     uint64_t nbInputs;
     uint64_t nbOutputs;
     uint64_t currBlock;
+    uint32_t txVersion;
     uint64_t nbDumped;
     const uint8_t *txStart;
     std::vector<uint256_t> rootHashes;
@@ -41,7 +42,7 @@ struct DumpTX:public Callback
     virtual const char                   *name() const         { return "dumpTX"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;  }
     virtual bool                         needTXHash() const    { return true;     }
-
+    virtual bool                         needEdge() const    { return false;     }
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -53,7 +54,7 @@ struct DumpTX:public Callback
     }
 
     virtual int init(
-        int argc,
+        int        argc,
         const char *argv[]
     )
     {
@@ -70,7 +71,7 @@ struct DumpTX:public Callback
             info("dumping %d transactions\n", (int)rootHashes.size());
         } else {
             const char *defaultTX = "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"; // Expensive pizza
-            warning("no TX hashes specified, using the infamous 10K pizza TX");
+            warning("no TX hashes specified, using the famous 10K pizza TX");
             loadHash256List(rootHashes, defaultTX);
         }
 
@@ -84,31 +85,29 @@ struct DumpTX:public Callback
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
-        currBlock = b->height;
-
-        const uint8_t *p = b->data;
+    virtual void startBlock(const Block *b, uint64_t) {
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
+        currBlock = b->height;
         bTime = blkTime;
     }
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
+        valueIn = 0;
+        valueOut = 0;
         txStart = p;
         nbInputs = 0;
         nbOutputs = 0;
-        dump = (txMap.end()!=txMap.find(hash));
-
+        dump = !hash or (txMap.end()!=txMap.find(hash));
         if(dump) {
 
             struct tm gmTime;
@@ -123,13 +122,14 @@ struct DumpTX:public Callback
 
             LOAD(uint32_t, version, p);
 
-            printf("TX = {\n\n");
+            printf("TX = {\n");
             printf("    version = %" PRIu32 "\n", version);
             printf("    minted in block = %" PRIu64 "\n", currBlock-1);
             printf("    mint time = %" PRIu64 " (%s GMT)\n", bTime, timeBuf);
             printf("    txHash = ");
-            showHex(hash);
-            printf("\n\n");
+            if (hash)
+                showHex(hash);
+            printf("\n");
         }
     }
 
@@ -181,13 +181,24 @@ struct DumpTX:public Callback
         }
     }
 
+    virtual void startWitness(
+        const uint8_t *p
+    )
+    {
+        if(dump) {
+            LOAD_VARINT(witScriptSize, p);
+            printf("segwit len: %lu\n", witScriptSize);
+            showScript(p, witScriptSize, 0, "        ");
+        }
+    }
+
     virtual void startInput(
         const uint8_t *p
     )
     {
         if(dump) {
             printf(
-                "    input[%" PRIu64 "] = {\n\n",
+                "    input[%" PRIu64 "] = {\n",
                 nbInputs++
             );
 
@@ -200,59 +211,17 @@ struct DumpTX:public Callback
                 uint64_t reward = getBaseReward(currBlock);
                 printf("        generation transaction\n");
                 printf("        based on block height, reward = %.8f\n", 1e-8*reward);
-                printf("        hex dump of coinbase follows:\n\n");
+                printf("        hex dump of coinbase follows:\n");
                 canonicalHexDump(p, inputScriptSize, "        ");
                 valueIn += reward;
             }
-        }
-    }
 
-    static void showScriptInfo(
-        const uint8_t   *outputScript,
-        uint64_t        outputScriptSize
-    )
-    {
-        uint8_t type[128];
-        const char *typeName = "unknown";
-        uint8_t pubKeyHash[kSHA256ByteSize];
-        int r = solveOutputScript(pubKeyHash, outputScript, outputScriptSize, type);
-        switch(r) {
-            case 0: {
-                typeName = "pays to hash160(pubKey)";
-                break;
-            }
-            case 1: {
-                typeName = "pays to explicit uncompressed pubKey";
-                break;
-            }
-            case 2: {
-                typeName = "pays to explicit compressed pubKey";
-                break;
-            }
-            case 3: {
-                typeName = "pays to hash160(script)";
-                break;
-            }
-            case 4: {
-                typeName = "pays to hash160(script)";
-                break;
-            }
-            case -2: {
-                typeName = "broken script generated by p2pool - coins lost";
-                break;
-            }
-            case -1: {
-                typeName = "couldn't parse script";
-                break;
-            }
-        }
-        printf("\n");
-        printf("        script type = %s\n", typeName);
-
-        if(0<=r) {
-            uint8_t btcAddr[64];
-            hash160ToAddr(btcAddr, pubKeyHash);
-            printf("        script pays to address %s\n", btcAddr);
+            uint8_t buf[1 + 2*kSHA256ByteSize];
+            toHex(buf, upTXHash.v);
+            printf("        outputIndex = %d\n", upOutputIndex);
+            printf("        upTXHash = %s\n\n", buf);
+            printf("        # challenge answer script, bytes=%" PRIu64 ", (on downstream input) ", inputScriptSize);
+            showScript(p, inputScriptSize, 0, "        ");
         }
     }
 
@@ -287,11 +256,17 @@ struct DumpTX:public Callback
     }
 
     virtual void endInput(
-        const uint8_t *p
-    )
+                          const uint8_t *pend,
+                          const uint8_t *upTXHash,
+                          uint64_t      outputIndex,
+                          const uint8_t *downTXHash,
+                          uint64_t      inputIndex,
+                          const uint8_t *inputScript,
+                          uint64_t      inputScriptSize
+                          )
     {
         if(dump) {
-            printf("    }\n\n");
+            printf("    }\n");
         }
     }
 
@@ -313,8 +288,7 @@ struct DumpTX:public Callback
     {
         if(dump) {
             printf(
-                "\n"
-                "    output[%" PRIu64 "] = {\n\n",
+                "    output[%" PRIu64 "] = {\n",
                 nbOutputs++
             );
         }
@@ -331,10 +305,10 @@ struct DumpTX:public Callback
     {
         if(dump) {
             printf("        value = %.8f\n", value*1e-8);
-            printf("        challenge script, bytes=%" PRIu64 " :\n", outputScriptSize);
+            printf("        challenge script, bytes=%" PRIu64 ", ", outputScriptSize);
             showScript(outputScript, outputScriptSize, 0, "        ");
             showScriptInfo(outputScript, outputScriptSize);
-            printf("    }\n\n");
+            printf("    }\n");
             valueOut += value;
         }
     }
@@ -349,20 +323,19 @@ struct DumpTX:public Callback
             printf("   nbOutputs = %" PRIu64 "\n", (uint64_t)nbOutputs);
             printf("    byteSize = %" PRIu64 "\n", (uint64_t)(p - txStart));
             printf("    lockTime = %" PRIu32 "\n", (uint32_t)lockTime);
-            printf("     valueIn =  %.2f\n", valueIn*1e-8);
-            printf("    valueOut =  %.2f\n", valueOut*1e-8);
+            printf("     valueIn =  %.8f\n", valueIn*1e-8);
+            printf("    valueOut =  %.8f\n", valueOut*1e-8);
             if(!isGenTX) {
-                printf("        fees =  %.2f\n", (valueIn-valueOut)*1e-8);
+                printf("        fees =  %.8f\n", (valueIn-valueOut)*1e-8);
             }
             printf("}\n");
             ++nbDumped;
         }
 
-        if(nbDumped==txMap.size()) {
-            exit(0);
-        }
+        // if(nbDumped==txMap.size()) {
+        //     exit(0);
+        // }
     }
 };
 
 static DumpTX dumpTX;
-

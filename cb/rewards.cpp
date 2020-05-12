@@ -38,7 +38,7 @@ struct Rewards:public Callback
     virtual const char                   *name() const         { return "rewards"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;   }
     virtual bool                         needTXHash() const    { return true;      }
-
+    virtual bool                         needEdge() const      { return false;     }
     virtual int init(
         int argc,
         const char *argv[]
@@ -48,26 +48,26 @@ struct Rewards:public Callback
         fullDump = values.get("full");
 
         info("Dumping all block rewards in blockchain");
+        printf("block\tbaseReward\tfees\ttotal\n");
+
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
-        const uint8_t *p = b->data;
+    virtual void startBlock(const Block *b, uint64_t) {
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
         currBlock = b->height - 1;
         reward = 0;
     }
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         currTXHash = hash;
@@ -105,65 +105,50 @@ struct Rewards:public Callback
     {
         if(!hasGenInput) return;
 
+        reward += value;
+        if(!fullDump) return;
+
         uint8_t addrType[3];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(
-            pubKeyHash.v,
-            outputScript,
-            outputScriptSize,
-            addrType
-        );
-        if(unlikely(-2==type)) return;
-
-        if(unlikely(type<0) && 0!=value && fullDump) {
+        int outputType = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
+        // if(unlikely(-2==type)) return;
+        if(unlikely(outputType<0) && 0!=value) {
             printf("============================\n");
-            printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock);
+            printf("BLOCK %d ... RAW ASCII DUMP OF FAILING SCRIPT = ", (int)currBlock-1);
             fwrite(outputScript, outputScriptSize, 1, stdout);
             printf("value = %16.8f\n", value*1e-8);
             showScript(outputScript, outputScriptSize);
             printf("============================\n\n");
             printf("\n");
-            errFatal("invalid script");
+            //errFatal("invalid script");
         }
-
-        reward += value;
-        if(!fullDump) return;
-
-        printf("%7d ", (int)currBlock);
+        printf("%7d ", (int)currBlock-1);
         showHex(currTXHash);
-
         printf(" %16.8f ", 1e-8*value);
-
-        if(type<0) {
-            printf("######################################## ##################################\n");
+        if(outputType<0) {
+            printf("##########################################################################\n");
             return;
         } else {
-
             showFullAddr(pubKeyHash.v, true);
-            printf(" %2d ", type);
-
+            printf(" %2d ", outputType);
             // pay to hash160(pubKey)
-            if(0==type) {
+            if(0==outputType) {
                 // No pubkey
             }
-
             // pay to explicit pubKey
-            if(1==type) {
+            if(1==outputType) {
                 showHex(1+outputScript, 65, false);
             }
-
             // pay to explicit compressed pubKeys
-            if(2==type) {
+            if(2==outputType) {
                 uint8_t decompressed[65];
                 bool r = decompressPublicKey(decompressed, 1+outputScript);
                 showHex(decompressed, 65, false);
             }
-
             // pay to hash160(script)
-            if(3==type) {
+            if(3==outputType) {
                 // No pubkey, no script
             }
-
             printf("\n");
         }
     }
@@ -175,8 +160,8 @@ struct Rewards:public Callback
         uint64_t baseReward = getBaseReward(currBlock);
         int64_t feesEarned = reward - (int64_t)baseReward;   // This sometimes goes <0 for some early, buggy blocks
         printf(
-            "Summary for block %7d : baseReward=%16.8f fees=%16.8f total=%16.8f\n",
-            (int)currBlock,
+            "block %7d: baseReward=%-3.8f fees=%-3.8f total=%-3.8f\n",
+            (int)currBlock-1,
             1e-8*baseReward,
             1e-8*feesEarned,
             1e-8*reward
@@ -185,4 +170,3 @@ struct Rewards:public Callback
 };
 
 static Rewards rewards;
-

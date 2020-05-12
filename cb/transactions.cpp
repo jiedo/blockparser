@@ -1,4 +1,4 @@
-
+// 与地址A相关的, 包括输入/输出 的 Transactions
 // Dump all transactions affecting a specific address
 
 #include <time.h>
@@ -46,7 +46,6 @@ struct Transactions:public Callback
     virtual const char                   *name() const         { return "transactions"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;        }
     virtual bool                         needTXHash() const    { return true;           }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -104,16 +103,14 @@ struct Transactions:public Callback
         const uint8_t *downTXHash = 0
     )
     {
-        uint8_t addrType[3];
+        uint8_t addrType[4];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
-        if(unlikely(type<0)) return;
+        int outputType = solveOutputScript(pubKeyHash.v, script, scriptSize, addrType);
+        if(unlikely(outputType<0)) return;
 
         bool match = (addrMap.end() != addrMap.find(pubKeyHash.v));
         if(unlikely(match)) {
-
             int64_t newSum = sum + value*(add ? 1 : -1);
-
             if(csv) {
                 printf("%6" PRIu64 ", \"", bTime/86400 + 25569);
                 showHex(pubKeyHash.v, kRIPEMD160ByteSize, false);
@@ -197,16 +194,13 @@ struct Transactions:public Callback
         );
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
-        const uint8_t *p = b->data;
+    virtual void startBlock(const Block *b, uint64_t) {
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
         LOAD(uint32_t, blkTime, p);
+
         bTime = blkTime;
     }
 
@@ -228,17 +222,13 @@ struct Transactions:public Callback
         else {
             info("Dumping all transactions for %d address(es)\n", (int)addrMap.size());
             printf("    Time (GMT)                  Address                                     Transaction                                                                    OldBalance                     Amount                 NewBalance\n");
-            printf("    =======================================================================================================================================================================================================================\n");
+
         }
     }
 
     virtual void wrapup()
     {
         if(false==csv) {
-            printf(
-                "    =======================================================================================================================================================================================================================\n"
-            );
-
             info(
                 "\n"
                 "    transactions  = %" PRIu64 "\n"
@@ -256,4 +246,3 @@ struct Transactions:public Callback
 };
 
 static Transactions transactions;
-

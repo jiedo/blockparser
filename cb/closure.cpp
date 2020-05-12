@@ -1,4 +1,3 @@
-
 // Dump the transitive closure of a bunch of addresses
 
 #include <util.h>
@@ -42,7 +41,6 @@ struct Closure:public Callback
     virtual const char                   *name() const         { return "closure"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;   }
     virtual bool                         needTXHash() const    { return true;      }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -92,8 +90,8 @@ struct Closure:public Callback
     {
         uint8_t addrType[3];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
-        if(unlikely(type<0)) return;
+        int outputType = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
+        if(unlikely(outputType<0)) return;
 
         uint64_t a;
         auto i = addrMap.find(pubKeyHash.v);
@@ -165,7 +163,8 @@ struct Closure:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         vertices.resize(0);
@@ -187,4 +186,3 @@ struct Closure:public Callback
 };
 
 static Closure closure;
-

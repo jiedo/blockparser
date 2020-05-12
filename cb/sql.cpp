@@ -64,7 +64,6 @@ struct SQLDump:public Callback
     virtual const char                   *name() const         { return "sqldump"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;   }
     virtual bool                         needTXHash() const    { return true;      }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -177,17 +176,13 @@ struct SQLDump:public Callback
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
+    virtual void startBlock(const Block *b, uint64_t) {
         if(0<=cutoffBlock && cutoffBlock<b->height) wrapup();
 
+        auto p = b->chunk->getData();
         uint8_t blockHash[kSHA256ByteSize];
-        sha256Twice(blockHash, b->data, 80);
+        sha256Twice(blockHash, p, 80);
 
-        const uint8_t *p = b->data;
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -215,7 +210,8 @@ struct SQLDump:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         // id BIGINT PRIMARY KEY
@@ -244,8 +240,9 @@ struct SQLDump:public Callback
 
         uint8_t addrType[3];
         uint160_t pubKeyHash;
-        int type = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
-        if(likely(0<=type)) hash160ToAddr(address, pubKeyHash.v);
+        int outputType = solveOutputScript(pubKeyHash.v, outputScript, outputScriptSize, addrType);
+        if(likely(0<=outputType))
+            hash160ToAddr(address, pubKeyHash.v, (uint8_t)addrType[0]);
 
         // id BIGINT PRIMARY KEY
         // dstAddress CHAR(36)
@@ -331,4 +328,3 @@ struct SQLDump:public Callback
 };
 
 static SQLDump sqlDump;
-

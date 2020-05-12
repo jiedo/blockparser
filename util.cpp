@@ -18,20 +18,48 @@
 const uint8_t hexDigits[] = "0123456789abcdef";
 const uint8_t b58Digits[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-template<> uint8_t *PagedAllocator<Block>::pool = 0;
-template<> uint8_t *PagedAllocator<Block>::poolEnd = 0;
-
+static std::vector<uint8_t *> vec_256;
+template<> std::vector<uint8_t *> PagedAllocator<uint256_t>::reuse_pool = vec_256;
+template<> uint32_t PagedAllocator<uint256_t>::total_malloc = 0;
 template<> uint8_t *PagedAllocator<uint256_t>::pool = 0;
 template<> uint8_t *PagedAllocator<uint256_t>::poolEnd = 0;
 
+static std::vector<uint8_t *> vec_160;
+template<> std::vector<uint8_t *> PagedAllocator<uint160_t>::reuse_pool = vec_160;
+template<> uint32_t PagedAllocator<uint160_t>::total_malloc = 0;
 template<> uint8_t *PagedAllocator<uint160_t>::pool = 0;
 template<> uint8_t *PagedAllocator<uint160_t>::poolEnd = 0;
 
-double usecs()
-{
+static std::vector<uint8_t *> vec_64;
+template<> std::vector<uint8_t *> PagedAllocator<hash64_t>::reuse_pool = vec_64;
+template<> uint32_t PagedAllocator<hash64_t>::total_malloc = 0;
+template<> uint8_t *PagedAllocator<hash64_t>::pool = 0;
+template<> uint8_t *PagedAllocator<hash64_t>::poolEnd = 0;
+
+static std::vector<uint8_t *> vec_chunk;
+template<> std::vector<uint8_t *> PagedAllocator<Chunk>::reuse_pool = vec_chunk;
+template<> uint32_t PagedAllocator<Chunk>::total_malloc = 0;
+template<> uint8_t *PagedAllocator<Chunk>::pool = 0;
+template<> uint8_t *PagedAllocator<Chunk>::poolEnd = 0;
+
+static std::vector<uint8_t *> vec_block;
+template<> std::vector<uint8_t *> PagedAllocator<Block>::reuse_pool = vec_block;
+template<> uint32_t PagedAllocator<Block>::total_malloc = 0;
+template<> uint8_t *PagedAllocator<Block>::pool = 0;
+template<> uint8_t *PagedAllocator<Block>::poolEnd = 0;
+
+double usecs() {
     struct timeval t;
     gettimeofday(&t, 0);
     return t.tv_usec + 1000000*((uint64_t)t.tv_sec);
+}
+
+void gmTime(char *timeBuf, const time_t &last) {
+    struct tm gmTime;
+    gmtime_r(&last, &gmTime);
+    asctime_r(&gmTime, timeBuf);
+    size_t sz =strlen(timeBuf);
+    if(0<sz) timeBuf[sz-1] = 0;
 }
 
 void toHex(
@@ -50,7 +78,7 @@ void toHex(
         e = src-1;
         incr = -1;
     }
-    
+
     while(likely(p!=e))
     {
         uint8_t c = p[0];
@@ -81,7 +109,7 @@ uint8_t fromHexDigit(
     if(likely('0'<=h && h<='9')) return      (h - '0');
     if(likely('a'<=h && h<='f')) return 10 + (h - 'a');
     if(likely('A'<=h && h<='F')) return 10 + (h - 'A');
-    if(abortOnErr) errFatal("incorrect hex digit %c", h);
+    if(abortOnErr) errFatal("incorrect hex digit %d", h);
     return 0xFF;
 }
 
@@ -116,6 +144,112 @@ bool fromHex(
     return true;
 }
 
+int IsCanonicalPubKey(
+                      const uint8_t *vchPubKey,
+                      size_t        scriptSize
+                      ) {
+
+    if (scriptSize < 33)
+      return -1;    //error("Non-canonical public key: too short");
+    if (vchPubKey[0] == 0x04) {
+        if (scriptSize != 65)
+            return -2;    // error("Non-canonical public key: invalid length for uncompressed key");
+    } else if (vchPubKey[0] == 0x02 || vchPubKey[0] == 0x03) {
+        if (scriptSize != 33)
+            return -3;    // error("Non-canonical public key: invalid length for compressed key");
+    } else {
+        return -4;    // error("Non-canonical public key: compressed nor uncompressed");
+    }
+    return 0;
+}
+
+
+int IsCanonicalSignature(
+                          const uint8_t *vchSig,
+                          size_t        scriptSize
+                          ) {
+
+    // See https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
+    // A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
+    // Where R and S are not negative (their first byte has its highest bit not set), and not
+    // excessively padded (do not start with a 0 byte, unless an otherwise negative number follows,
+    // in which case a single 0 byte is necessary and even required).
+    if (scriptSize < 9)
+      return -1;                //("Non-canonical signature: too short");
+    if (scriptSize > 73)
+        return -2;                //("Non-canonical signature: too long");
+
+    // unsigned char nHashType = vchSig[scriptSize - 1] & (~(SIGHASH_ANYONECANPAY));
+    // if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
+    //     return ("Non-canonical signature: unknown hashtype byte");
+
+    if (vchSig[0] != 0x30)
+        return -3;                // ("Non-canonical signature: wrong type");
+    if (vchSig[1] != scriptSize-3)
+        return -4;                //("Non-canonical signature: wrong length marker");
+
+    unsigned int nLenR = vchSig[3];
+    if (5 + nLenR >= scriptSize)
+        return -5;                //("Non-canonical signature: S length misplaced");
+
+    unsigned int nLenS = vchSig[5+nLenR];
+    if ((unsigned long)(nLenR+nLenS+7) != scriptSize)
+        return -6;                //("Non-canonical signature: R+S length mismatch");
+
+    const unsigned char *R = &vchSig[4];
+    if (R[-2] != 0x02)
+        return -7;                //("Non-canonical signature: R value type mismatch");
+    if (nLenR == 0)
+        return -8;                //("Non-canonical signature: R length is zero");
+    // if (R[0] & 0x80)
+    //     return -9;                //("Non-canonical signature: R value negative");
+    if (nLenR > 1 && (R[0] == 0x00) && !(R[1] & 0x80))
+        return -19;                //("Non-canonical signature: R value excessively padded");
+
+    const unsigned char *S = &vchSig[6+nLenR];
+    if (S[-2] != 0x02)
+        return -11;                //("Non-canonical signature: S value type mismatch");
+    if (nLenS == 0)
+        return -12;                //("Non-canonical signature: S length is zero");
+    // if (S[0] & 0x80)
+    //     return -13;                //("Non-canonical signature: S value negative");
+    if (nLenS > 1 && (S[0] == 0x00) && !(S[1] & 0x80))
+        return -14;                //("Non-canonical signature: S value excessively padded");
+
+
+    return 0;                //"ok";
+}
+
+int get_script_type(const uint8_t *p, size_t scriptSize, uint8_t *type) {
+  const uint8_t *start_p = p;
+  const uint8_t *e = scriptSize + p;
+  uint8_t last_c = 0;
+  while(likely(p<e)) {
+    LOAD(uint8_t, c, p);
+
+    if (p - start_p >= kRIPEMD160ByteSize)
+      break;
+
+    bool isImmediate = (0<c && c<79);
+    if(!isImmediate) {
+      type[(p - start_p)-1] = c;
+    } else {
+      uint64_t dataSize = 0;
+      if(likely(c<=75)) {                            dataSize = c; }
+      else if(likely(76==c)) { LOAD( uint8_t, v, p); dataSize = v; }
+      else if(likely(77==c)) { LOAD(uint16_t, v, p); dataSize = v; }
+      else if(likely(78==c)) { LOAD(uint32_t, v, p); dataSize = v; }
+
+      type[(p - start_p)-1] = 75;
+      start_p += dataSize;
+
+      p += dataSize;
+    }
+  }
+  return p - start_p;
+}
+
+
 void showScript(
     const uint8_t *p,
     size_t        scriptSize,
@@ -126,36 +260,70 @@ void showScript(
     bool first = true;
     const uint8_t *e = scriptSize + p;
     indent = indent ? indent : "";
+    uint8_t last_c = 0;
+
+    printf("ScriptHex: ");
+    showHex(p, scriptSize, false);
     while(likely(p<e)) {
         LOAD(uint8_t, c, p);
-        bool isImmediate = (0<c && c<79) ;
+        bool isImmediate = (0<c && c<0x4f) ;
         if(!isImmediate) {
+          if (last_c == c)
+            printf(".");
+          else
             printf(
-                "    %s0x%02X %s%s\n",
+                "\n    %s0x%02X %s%s",
                 indent,
                 c,
                 getOpcodeName(c),
                 (first && header) ? header : ""
             );
+          last_c = c;
         }
         else
         {
+          last_c = 75;
             uint64_t dataSize = 0;
-                 if(likely(c<=75)) {                       dataSize = c; }
-            else if(likely(76==c)) { LOAD( uint8_t, v, p); dataSize = v; }
-            else if(likely(77==c)) { LOAD(uint16_t, v, p); dataSize = v; }
-            else if(likely(78==c)) { LOAD(uint32_t, v, p); dataSize = v; }
-            printf("         %sOP_PUSHDATA(%" PRIu64 ", 0x", indent, dataSize);
+            if(likely(c<= 0x4b)) {                       dataSize = c; }
+            else if(likely(0x4c==c)) { LOAD( uint8_t, v, p); dataSize = v; } // 76
+            else if(likely(0x4d==c)) { LOAD(uint16_t, v, p); dataSize = v; }
+            else if(likely(0x4e==c)) { LOAD(uint32_t, v, p); dataSize = v; }
+
+            if (p >= e) break;
+            if (p+dataSize >= e)
+              dataSize = e-p;
+
+            printf("\n         %sOP_PUSHDATA(%" PRIu64 ", 0x", indent, dataSize);
             showHex(p, dataSize, false);
 
+            int iscanonicalsignature = IsCanonicalSignature(p, dataSize);
             printf(
-                ")%s\n",
-                (first && header) ? header : ""
+                   "){%d}%s", iscanonicalsignature,
+                   (first && header) ? header : ""
             );
+
+            if (iscanonicalsignature == 0) // ok
+              {
+                printf("\n         %sHashType(%d)", indent, p[dataSize-1]);
+
+                unsigned int nLenR = p[3];
+                unsigned int nLenS = p[5+nLenR];
+                const unsigned char *R = &p[4];
+                const unsigned char *S = &p[6+nLenR];
+                printf("\n         %sR(%d, 0x", indent, nLenR);
+                showHex(R, nLenR, false);
+                printf(")");
+
+                printf("\n         %sS(%d, 0x", indent, nLenS);
+                showHex(S, nLenS, false);
+                printf(")");
+              }
+
             p += dataSize;
         }
         first = false;
     }
+    printf("\n");
 }
 
 bool compressPublicKey(
@@ -218,96 +386,134 @@ bool decompressPublicKey(
     return true;
 }
 
-int solveOutputScript(
-          uint8_t *pubKeyHash,
-    const uint8_t *script,
-    uint64_t      scriptSize,
-    uint8_t       *type
-)
-{
-    type[0] = 0;
+void showScriptInfo(
+    const uint8_t   *outputScript,
+    uint64_t        outputScriptSize
+    ) {
+    uint8_t addrType[128];
+    const char *typeName = "unknown";
+    uint8_t pubKeyHash[kRIPEMD160ByteSize];
+    int outputType = solveOutputScript(pubKeyHash, outputScript, outputScriptSize, addrType);
+    const char *script_type_name[] = {
+        "broken script generated by p2pool - coins lost",
+        "couldn't parse script",
+        "pays to hash160(pubKey)",
+        "pays to explicit uncompressed pubKey",
+        "pays to explicit compressed pubKey",
+        "pays to hash160(script)",
+        "pays to hash160(script)",
+    };
+    if (outputType >= -2 && outputType <=4) {
+        typeName = script_type_name[outputType+2];
+    }
+    printf("\n        script type = %s\n", typeName);
+    if(0 <= outputType) {
+        uint8_t btcAddr[64];
+        hash160ToAddr(btcAddr, pubKeyHash, (uint8_t)addrType[0]);
+        printf("        script pays to address %s\n", btcAddr);
+    }
+}
 
+int solveOutputScript(uint8_t *pubKeyHash, const uint8_t *script, uint64_t scriptSize, uint8_t *addType) {
+    addType[0] = 0;
     // The most common output script type, pays to hash160(pubKey)
-    if(
-        likely(
+    if(likely(25==scriptSize             &&
             0x76==script[0]              &&  // OP_DUP
             0xA9==script[1]              &&  // OP_HASH160
               20==script[2]              &&  // OP_PUSHDATA(20)
             0x88==script[scriptSize-2]   &&  // OP_EQUALVERIFY
-            0xAC==script[scriptSize-1]   &&  // OP_CHECKSIG
-              25==scriptSize
-        )
-    )
-    {
+            0xAC==script[scriptSize-1]       // OP_CHECKSIG
+        )) {
         memcpy(pubKeyHash, 3+script, kRIPEMD160ByteSize);
         return 0;
     }
 
     // Output script commonly found in block reward TX, pays to explicit pubKey
-    if(
-        likely(
+    if(likely(67==scriptSize            &&
               65==script[0]             &&  // OP_PUSHDATA(65)
-            0xAC==script[scriptSize-1]  &&  // OP_CHECKSIG
-              67==scriptSize
-        )
-    )
-    {
+            0xAC==script[scriptSize-1]      // OP_CHECKSIG
+        )) {
         uint256_t sha;
         sha256(sha.v, 1+script, 65);
         rmd160(pubKeyHash, sha.v, kSHA256ByteSize);
         return 1;
     }
 
+    // Recent output script type, pays to hash160(script)
+    if(likely(23==scriptSize            &&
+            0xA9==script[0]             &&  // OP_HASH160
+              20==script[1]             &&  // OP_PUSHDATA(20)
+            0x87==script[scriptSize-1]      // OP_EQUAL
+        )) {
+        memcpy(pubKeyHash, 2+script, kRIPEMD160ByteSize);
+        addType[0] = 5;
+        return 3;
+    }
+
+    // Output script is multi sig 1 from 2, pays to explicit 2 pubKey
+    if(likely(scriptSize >= 37                   &&
+                    0x51 <= script[0]            &&  // OP_1/2/3
+    script[scriptSize-2] >= script[0]            &&  // OP_1/2/3
+        (0x41==script[1] || 0x21==script[1])     &&  // OP_PUSHDATA(65)
+    0x53>=script[scriptSize-2]                   &&  // OP_1/2/3
+    0xAE==script[scriptSize-1]                       // OP_CHECKMULTISIG
+           )) {
+        uint256_t sha;
+        sha256(sha.v, 2+script, script[1]);
+        rmd160(pubKeyHash, sha.v, kSHA256ByteSize);
+        // addType[0] = 0;
+        addType[1] = script[0] - 0x50;
+        addType[2] = script[scriptSize-2] - 0x50;
+        return 4;
+    }
+
     // Unusual output script, pays to explicit compressed pubKeys
-    if(
-        likely(
+    if(likely(35==scriptSize           &&
               33==script[0]            &&  // OP_PUSHDATA(33)
-            0xAC==script[scriptSize-1] &&  // OP_CHECKSIG
-              35==scriptSize
-        )
-    )
-    {
+            0xAC==script[scriptSize-1]     // OP_CHECKSIG
+      )) {
         //uint8_t pubKey[65];
         //bool ok = decompressPublicKey(pubKey, 1+script);
         //if(!ok) return -3;
-
         uint256_t sha;
         sha256(sha.v, 1+script, 33);
         rmd160(pubKeyHash, sha.v, kSHA256ByteSize);
         return 2;
     }
 
-    // Recent output script type, pays to hash160(script)
-    if(
-        likely(
-            0xA9==script[0]             &&  // OP_HASH160
-              20==script[1]             &&  // OP_PUSHDATA(20)
-            0x87==script[scriptSize-1]  &&  // OP_EQUAL
-              23==scriptSize
-        )
-    )
-    {
-        memcpy(pubKeyHash, 2+script, kRIPEMD160ByteSize);
-        type[0] = 'S';
-        type[1] = 0;
-        return 3;
+    // Broken output scripts that were created by p2pool for a while -- very likely lost coins
+    if(0x73==script[0] && // OP_IFDUP
+       0x63==script[1] && // OP_IF
+       0x72==script[2] && // OP_2SWAP
+       0x69==script[3] && // OP_VERIFY
+       0x70==script[4] && // OP_2OVER
+       0x74==script[5]    // OP_DEPTH
+        ) return -2;
+
+    if(likely(0x76==script[0]              &&  // OP_DUP
+              0xA9==script[1]              &&  // OP_HASH160
+                20==script[2]              &&  // OP_PUSHDATA(20)
+              0x88==script[scriptSize-3]   &&  // OP_EQUALVERIFY
+              0xAC==script[scriptSize-2]   &&  // OP_CHECKSIG
+              0x61==script[scriptSize-1]   &&  // OP_NOP
+                26==scriptSize)) {
+        memcpy(pubKeyHash, 3+script, kRIPEMD160ByteSize);
+        return 0;
     }
 
-    // Broken output scripts that were created by p2pool for a while -- very likely lost coins
-    if(
-        0x73==script[0] && // OP_IFDUP
-        0x63==script[1] && // OP_IF
-        0x72==script[2] && // OP_2SWAP
-        0x69==script[3] && // OP_VERIFY
-        0x70==script[4] && // OP_2OVER
-        0x74==script[5]    // OP_DEPTH
-    )
-        return -2;
+    // Broken output scripts, -- lost coins
+    if(likely(0x76==script[0]              &&  // OP_DUP
+              0xA9==script[1]              &&  // OP_HASH160
+              0x00==script[2]              &&  // OP_FALSE
+              0x88==script[3]   &&  // OP_EQUALVERIFY
+              0xAC==script[4]   &&  // OP_CHECKSIG
+                 5==scriptSize)) {
+        memcpy(pubKeyHash, 3+script, kRIPEMD160ByteSize);
+        return -3;
+    }
 
 #if 0
-
     // TODO : some scripts are solved by satoshi's client and not by the above. track them
-
     // Unknown output script type -- very likely lost coins, but hit the satoshi script solver to make sure
     int result = extractAddress(pubKeyHash, script, scriptSize);
     if(result) return -1;
@@ -317,6 +523,7 @@ int solveOutputScript(
 #endif
     return -1;
 }
+
 
 const uint8_t *loadKeyHash(
     const uint8_t *hexHash
@@ -367,7 +574,6 @@ bool addrToHash160(
     static BN_CTX *ctx = 0;
     if(unlikely(!ctx)) {
         ctx = BN_CTX_new();
-        BN_CTX_init(ctx);
         sum = BN_new();
     }
 
@@ -394,7 +600,7 @@ bool addrToHash160(
 
     BN_bn2mpi(sum, buf);
 
-    uint32_t recordedSize = 
+    uint32_t recordedSize =
         (buf[0]<<24)    |
         (buf[1]<<16)    |
         (buf[2]<< 8)    |
@@ -486,8 +692,6 @@ void hash160ToAddr(
     if(!ctx)
     {
         ctx = BN_CTX_new();
-        BN_CTX_init(ctx);
-
         b58 = BN_new();
         num = BN_new();
         div = BN_new();
@@ -731,4 +935,3 @@ uint64_t getBaseReward(
     reward >>= shift;
     return reward;
 }
-

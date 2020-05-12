@@ -13,8 +13,6 @@ struct Help:public Callback
 
     virtual const char             *name() const               { return "help"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;}
-    virtual bool                   needTXHash() const          { return false;  }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -103,4 +101,3 @@ struct Help:public Callback
 };
 
 static Help help;
-

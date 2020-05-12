@@ -35,7 +35,6 @@ struct Pristine:public Callback
     virtual const char                   *name() const         { return "pristine"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;    }
     virtual bool                         needTXHash() const    { return true;       }
-
     virtual int init(
         int argc,
         const char *argv[]
@@ -50,12 +49,8 @@ struct Pristine:public Callback
         return 0;
     }
 
-    virtual void startBlock(
-        const Block *b,
-        uint64_t
-    )
-    {
-        const uint8_t *p = b->data;
+    virtual void startBlock(const Block *b, uint64_t) {
+        const uint8_t *p = b->chunk->getData();
         SKIP(uint32_t, version, p);
         SKIP(uint256_t, prevBlkHash, p);
         SKIP(uint256_t, blkMerkleRoot, p);
@@ -67,7 +62,8 @@ struct Pristine:public Callback
 
     virtual void startTX(
         const uint8_t *p,
-        const uint8_t *hash
+        const uint8_t *hash,
+        const uint8_t *txEnd
     )
     {
         currTXHash = hash;
@@ -87,18 +83,17 @@ struct Pristine:public Callback
     {
         static uint256_t gNullHash;
         bool isGenInput = (0==memcmp(gNullHash.v, p, sizeof(gNullHash)));
-        if(isGenInput) hasGenInput = true;
+        if(isGenInput) {
+            hasGenInput = true;
+        }
         ++nbInputs;
     }
 
-    virtual void  endInputs(
-        const uint8_t *p
-    )
-    {
+    virtual void  endInputs(const uint8_t *p) {
         if(hasGenInput) {
-
-            if(1!=nbInputs) abort();
-
+            if(1!=nbInputs) {
+                abort();
+            }
             uint64_t age = currTime;
             uint64_t blk = currBlock;
             txMap[currTXHash] = (age<<32) + blk;
@@ -145,7 +140,7 @@ struct Pristine:public Callback
                     blk,
                     cTime
                 );
-        
+
                 showHex(i->first);
                 putchar('\n');
             }
@@ -155,4 +150,3 @@ struct Pristine:public Callback
 };
 
 static Pristine pristine;
-

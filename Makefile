@@ -7,11 +7,13 @@ CPLUS = g++
 INC =                           \
         -I.                     \
         -DNDEBUG                \
+        -DBITCOIN               \
 #        -DLITECOIN              \
 
-COPT =                          \
-        -g0                     \
-        -O6                     \
+COPT = -pg
+       # -O6
+
+COPT =  -O6                     \
         -m64                    \
         -Wall                   \
         -msse3                  \
@@ -27,16 +29,20 @@ COPT =                          \
         -Wformat-security       \
         -Wstrict-aliasing=2     \
         -Wno-variadic-macros    \
-        -fomit-frame-pointer    \
         -Wno-unused-variable    \
         -Wno-unused-parameter   \
 
-LOPT =                          \
-    -s                          \
+#        -fomit-frame-pointer    \
+
+LOPT = -s -pg
+LOPT = -pg
+LOPT = -L.
 
 LIBS =                          \
     -lcrypto                    \
     -ldl                        \
+    -lbloom                     \
+    -lpthread                   \
 
 all:parser
 
@@ -54,6 +60,34 @@ all:parser
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/allBalances.cpp -o .objs/allBalances.o
 	@mv .objs/allBalances.d .deps
 
+.objs/confirmDupRP.o : cb/confirmDupRP.cpp
+	@echo c++ -- cb/confirmDupRP.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/confirmDupRP.cpp -o .objs/confirmDupRP.o
+	@mv .objs/confirmDupRP.d .deps
+
+.objs/statusR.o : cb/statusR.cpp
+	@echo c++ -- cb/statusR.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/statusR.cpp -o .objs/statusR.o
+	@mv .objs/statusR.d .deps
+
+.objs/dumpShortRP.o : cb/dumpShortRP.cpp
+	@echo c++ -- cb/dumpShortRP.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpShortRP.cpp -o .objs/dumpShortRP.o
+	@mv .objs/dumpShortRP.d .deps
+
+.objs/dumpRscript.o : cb/dumpRscript.cpp
+	@echo c++ -- cb/dumpRscript.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpRscript.cpp -o .objs/dumpRscript.o
+	@mv .objs/dumpRscript.d .deps
+
 .objs/closure.o : cb/closure.cpp
 	@echo c++ -- cb/closure.cpp
 	@mkdir -p .deps
@@ -67,6 +101,21 @@ all:parser
 	@mkdir -p .objs
 	@${CPLUS} -MD ${INC} ${COPT}  -c cb/dumpTX.cpp -o .objs/dumpTX.o
 	@mv .objs/dumpTX.d .deps
+
+.objs/outType.o : cb/outType.cpp
+	@echo c++ -- cb/outType.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/outType.cpp -o .objs/outType.o
+	@mv .objs/outType.d .deps
+
+.objs/inType.o : cb/inType.cpp
+	@echo c++ -- cb/inType.cpp
+	@mkdir -p .deps
+	@mkdir -p .objs
+	@${CPLUS} -MD ${INC} ${COPT}  -c cb/inType.cpp -o .objs/inType.o
+	@mv .objs/inType.d .deps
+
 
 .objs/pristine.o : cb/pristine.cpp
 	@echo c++ -- cb/pristine.cpp
@@ -105,10 +154,10 @@ all:parser
 
 .objs/taint.o : cb/taint.cpp
 	@echo c++ -- cb/taint.cpp
-	@mkdir -p .deps
-	@mkdir -p .objs
-	@${CPLUS} -MD ${INC} ${COPT}  -c cb/taint.cpp -o .objs/taint.o
-	@mv .objs/taint.d .deps
+	mkdir -p .deps
+	mkdir -p .objs
+	${CPLUS} -MD ${INC} ${COPT}  -c cb/taint.cpp -o .objs/taint.o
+	mv .objs/taint.d .deps
 
 .objs/transactions.o : cb/transactions.cpp
 	@echo c++ -- cb/transactions.cpp
@@ -161,9 +210,15 @@ all:parser
 
 OBJS=                       \
     .objs/allBalances.o     \
+    .objs/confirmDupRP.o   \
+    .objs/statusR.o   \
+    .objs/dumpShortRP.o     \
+    .objs/dumpRscript.o     \
     .objs/callback.o        \
     .objs/closure.o         \
     .objs/dumpTX.o          \
+    .objs/outType.o         \
+    .objs/inType.o         \
     .objs/help.o            \
     .objs/opcodes.o         \
     .objs/option.o          \
@@ -178,12 +233,12 @@ OBJS=                       \
     .objs/transactions.o    \
     .objs/util.o            \
 
+
 parser:${OBJS}
-	@echo lnk -- parser 
+	@echo lnk -- parser
 	@${CPLUS} ${LOPT} ${COPT} -o parser ${OBJS} ${LIBS}
 
 clean:
 	-rm -r -f *.o *.i .objs .deps *.d parser
 
 -include .deps/*
-

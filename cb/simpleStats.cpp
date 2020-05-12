@@ -30,8 +30,6 @@ struct SimpleStats:public Callback
 
     virtual const char                   *name() const         { return "simpleStats"; }
     virtual const optparse::OptionParser *optionParser() const { return &parser;       }
-    virtual bool                         needTXHash() const    { return false;         }
-
     virtual void aliases(
         std::vector<const char*> &v
     ) const
@@ -79,7 +77,7 @@ struct SimpleStats:public Callback
             printf("    nbInputs = %s\n", P(nbInputs));
             printf("    nbOutputs = %s\n", P(nbOutputs));
             printf("    nbTransactions = %s\n", P(nbTransactions));
-            printf("    volume = %.2f (%s satoshis)\n", volume*1e-8, P(volume)); 
+            printf("    volume = %.2f (%s satoshis)\n", volume*1e-8, P(volume));
             printf("\n");
 
             printf("    avg tx per block = %.2f\n", nbTransactions/(double)nbValidBlocks);
@@ -90,13 +88,14 @@ struct SimpleStats:public Callback
         #undef P
     }
 
-    virtual void     startMap(const uint8_t *p                     ) { ++nbMaps;        }
-    virtual void   startBlock(const uint8_t *p                     ) { ++nbBlocks;      }
-    virtual void      startTX(const uint8_t *p, const uint8_t *hash) { ++nbTransactions;}
-    virtual void   startInput(const uint8_t *p                     ) { ++nbInputs;      }
-    virtual void  startOutput(const uint8_t *p                     ) { ++nbOutputs;     }
-    virtual void   startBlock(  const Block *b, uint64_t           ) { ++nbValidBlocks; }
+    virtual void     startMap(const uint8_t *p         ) { ++nbMaps;        }
+    virtual void   startBlock(const uint8_t *p         ) { ++nbBlocks;      }
+    virtual void      startTX(const uint8_t *p,
+                              const uint8_t *hash,
+                              const uint8_t *txEnd     ) { ++nbTransactions;}
+    virtual void   startInput(const uint8_t *p         ) { ++nbInputs;      }
+    virtual void  startOutput(const uint8_t *p         ) { ++nbOutputs;     }
+    virtual void   startBlock(const Block *b, uint64_t ) { ++nbValidBlocks; }
 };
 
 static SimpleStats simpleStats;
-
